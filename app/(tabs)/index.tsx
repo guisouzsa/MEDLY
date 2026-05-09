@@ -1,98 +1,212 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { router } from 'expo-router'
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
-
-export default function HomeScreen() {
+export default function Home() {
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
-  );
+      {/* Header */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.headerSub}>Olá, bem-vindo 👋</Text>
+          <Text style={styles.headerTitle}>Painel Principal</Text>
+        </View>
+        <TouchableOpacity style={styles.avatarBtn}>
+          <Text style={styles.avatarTexto}>👤</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Card destaque */}
+      <View style={styles.cardDestaque}>
+        <Text style={styles.cardDestaqueEmoji}>💜</Text>
+        <Text style={styles.cardDestaqueTitulo}>Tudo certo por hoje!</Text>
+        <Text style={styles.cardDestaqueSubtitulo}>Nenhum alerta pendente.</Text>
+      </View>
+
+      {/* Cards rápidos */}
+      <Text style={styles.secaoTitulo}>Acesso Rápido</Text>
+      <View style={styles.grid}>
+        <TouchableOpacity style={[styles.cardGrid, { backgroundColor: '#ede9fe' }]}>
+          <Text style={styles.cardGridEmoji}>💊</Text>
+          <Text style={styles.cardGridTexto}>Medicamentos</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.cardGrid, { backgroundColor: '#fce7f3' }]}>
+          <Text style={styles.cardGridEmoji}>📅</Text>
+          <Text style={styles.cardGridTexto}>Consultas</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.cardGrid, { backgroundColor: '#e0f2fe' }]}>
+          <Text style={styles.cardGridEmoji}>📋</Text>
+          <Text style={styles.cardGridTexto}>Relatórios</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.cardGrid, { backgroundColor: '#dcfce7' }]}>
+          <Text style={styles.cardGridEmoji}>🩺</Text>
+          <Text style={styles.cardGridTexto}>Saúde</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Atividades recentes */}
+      <Text style={styles.secaoTitulo}>Atividades Recentes</Text>
+      <View style={styles.cardLista}>
+        {[
+          { emoji: '💊', texto: 'Medicamento tomado', hora: '08:00' },
+          { emoji: '🚶', texto: 'Caminhada realizada', hora: '09:30' },
+          { emoji: '📞', texto: 'Ligação com familiar', hora: '11:00' },
+          { emoji: '🍽️', texto: 'Refeição registrada', hora: '12:30' },
+        ].map((item, i) => (
+          <View key={i} style={[styles.listaItem, i !== 3 && styles.listaItemBorda]}>
+            <Text style={styles.listaEmoji}>{item.emoji}</Text>
+            <Text style={styles.listaTexto}>{item.texto}</Text>
+            <Text style={styles.listaHora}>{item.hora}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Botão sair */}
+      <TouchableOpacity
+        style={styles.botaoSair}
+        onPress={() => router.replace('/login')}
+      >
+        <Text style={styles.botaoSairTexto}>Sair</Text>
+      </TouchableOpacity>
+
+    </ScrollView>
+  )
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  scroll: {
+    flex: 1,
+    backgroundColor: '#f3eeff',
   },
-  stepContainer: {
-    gap: 8,
+  container: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+
+  // Header
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+    marginTop: 12,
+  },
+  headerSub: {
+    fontSize: 13,
+    color: '#a78bca',
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#6d28d9',
+  },
+  avatarBtn: {
+    backgroundColor: '#ede9fe',
+    borderRadius: 50,
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarTexto: {
+    fontSize: 22,
+  },
+
+  // Card destaque
+  cardDestaque: {
+    backgroundColor: '#7c3aed',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    marginBottom: 28,
+  },
+  cardDestaqueEmoji: {
+    fontSize: 36,
     marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  cardDestaqueTitulo: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 4,
   },
-});
+  cardDestaqueSubtitulo: {
+    fontSize: 13,
+    color: '#ddd6fe',
+  },
+
+  // Seção título
+  secaoTitulo: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#6d28d9',
+    marginBottom: 12,
+  },
+
+  // Grid
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 28,
+  },
+  cardGrid: {
+    width: '47%',
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+  },
+  cardGridEmoji: {
+    fontSize: 30,
+    marginBottom: 8,
+  },
+  cardGridTexto: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4c1d95',
+  },
+
+  // Lista
+  cardLista: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 8,
+    marginBottom: 28,
+  },
+  listaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+  },
+  listaItemBorda: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3eeff',
+  },
+  listaEmoji: {
+    fontSize: 20,
+    marginRight: 12,
+  },
+  listaTexto: {
+    flex: 1,
+    fontSize: 14,
+    color: '#3b0764',
+  },
+  listaHora: {
+    fontSize: 12,
+    color: '#a78bca',
+  },
+
+  // Botão sair
+  botaoSair: {
+    borderWidth: 1.5,
+    borderColor: '#7c3aed',
+    borderRadius: 12,
+    padding: 14,
+    alignItems: 'center',
+  },
+  botaoSairTexto: {
+    color: '#7c3aed',
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
+})
