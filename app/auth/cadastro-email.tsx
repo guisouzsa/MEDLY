@@ -6,17 +6,18 @@ import CampoGrande from '../../src/components/CampoGrande'
 import TelaEtapa from '../../src/components/TelaEtapa'
 import { useCadastro } from '../../src/context/CadastroContext'
 
-export default function CadastroNome() {
-  const { dados, setNome } = useCadastro()
+export default function CadastroEmail() {
+  const { dados, setEmail } = useCadastro()
   const [erro, setErro] = useState('')
 
   function avancar() {
-    if (dados.nome.trim().length < 2) {
-      setErro('Digite seu nome completo')
+    const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dados.email)
+    if (!emailValido) {
+      setErro('Digite um e-mail válido')
       return
     }
     setErro('')
-    router.push('/auth/cadastro-email')
+    router.push('/auth/cadastro-senha')
   }
 
   return (
@@ -25,18 +26,19 @@ export default function CadastroNome() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <TelaEtapa
-        titulo="Como você se chama?"
-        subtitulo="Seu primeiro nome ou nome completo"
+        titulo="Qual é o seu e-mail?"
+        subtitulo="Você usará ele para entrar no app"
         onVoltar={() => router.back()}
-        etapa={1}
+        etapa={2}
         totalEtapas={4}
       >
         <CampoGrande
-          label="Nome"
-          value={dados.nome}
-          onChangeText={(t) => { setNome(t); setErro('') }}
-          placeholder="Ex: Maria Aparecida"
-          autoCapitalize="words"
+          label="E-mail"
+          value={dados.email}
+          onChangeText={(t) => { setEmail(t); setErro('') }}
+          placeholder="Ex: maria@gmail.com"
+          keyboardType="email-address"
+          autoCapitalize="none"
           erro={erro}
         />
 

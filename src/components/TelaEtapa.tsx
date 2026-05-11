@@ -1,5 +1,5 @@
 import { Feather } from '@expo/vector-icons'
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 
 type Props = {
   titulo: string
@@ -45,11 +45,16 @@ export default function TelaEtapa({
         )}
       </View>
 
-      <View style={styles.corpo}>
+      <ScrollView
+        style={styles.corpo}
+        contentContainerStyle={styles.corpoConteudo}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.titulo}>{titulo}</Text>
         <Text style={styles.subtitulo}>{subtitulo}</Text>
         {children}
-      </View>
+      </ScrollView>
     </View>
   )
 }
@@ -93,6 +98,9 @@ const styles = StyleSheet.create({
   },
   corpo: {
     flex: 1,
+  },
+  corpoConteudo: {
+    flexGrow: 1,
   },
   titulo: {
     fontSize: 32,

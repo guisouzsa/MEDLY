@@ -4,7 +4,7 @@ import { CadastroProvider } from '../../src/context/CadastroContext'
 export default function AuthLayout() {
   return (
     <CadastroProvider>
-      <Stack screenOptions={{ headerShown: false }} />
+      <Stack screenOptions={{ headerShown: false, animation: 'none' }} />
     </CadastroProvider>
   )
 }

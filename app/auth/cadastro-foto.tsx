@@ -19,7 +19,7 @@ export default function CadastroFoto() {
       return
     }
     const resultado = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.6,
@@ -29,7 +29,8 @@ export default function CadastroFoto() {
     }
   }
 
-  async function finalizar() {
+  async function finalizar(pularFoto = false) {
+    if (carregando) return // evita duplo clique
     setCarregando(true)
 
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -42,9 +43,12 @@ export default function CadastroFoto() {
 
     if (authError) {
       setCarregando(false)
-      const msg = authError.message.includes('already registered')
-        ? 'Este email já está cadastrado.'
-        : 'Não foi possível criar a conta. Tente novamente.'
+      let msg = 'Não foi possível criar a conta. Tente novamente.'
+      if (authError.message.includes('already registered')) {
+        msg = 'Este email já está cadastrado.'
+      } else if (authError.status === 429) {
+        msg = 'Muitas tentativas. Aguarde alguns minutos e tente novamente.'
+      }
       Alert.alert('Erro', msg)
       return
     }
@@ -59,7 +63,7 @@ export default function CadastroFoto() {
 
     let fotoUrl: string | null = null
 
-    if (dados.fotoUri) {
+    if (!pularFoto && dados.fotoUri) {
       const ext = dados.fotoUri.split('.').pop() ?? 'jpg'
       const fileName = `${user.id}.${ext}`
       const formData = new FormData()
@@ -85,7 +89,6 @@ export default function CadastroFoto() {
     limpar()
     setCarregando(false)
     router.replace('/(tabs)' as any)
-
   }
 
   return (
@@ -110,14 +113,14 @@ export default function CadastroFoto() {
 
         <BotaoGrande
           texto="Criar minha conta"
-          onPress={finalizar}
+          onPress={() => finalizar(false)}
           carregando={carregando}
         />
 
         <BotaoGrande
           texto="Pular esta etapa"
           variante="secundario"
-          onPress={finalizar}
+          onPress={() => finalizar(true)}
           carregando={carregando}
         />
       </TelaEtapa>
@@ -126,36 +129,20 @@ export default function CadastroFoto() {
 }
 
 const styles = StyleSheet.create({
-  scroll: {
-    flexGrow: 1,
-  },
-  areaFoto: {
-    alignSelf: 'center',
-    marginBottom: 40,
-  },
+  scroll: { flexGrow: 1 },
+  areaFoto: { alignSelf: 'center', marginBottom: 40 },
   foto: {
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    borderWidth: 4,
-    borderColor: '#9163cb',
+    width: 180, height: 180, borderRadius: 90,
+    borderWidth: 4, borderColor: '#9163cb',
   },
   semFoto: {
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    backgroundColor: '#ede8fa',
-    borderWidth: 3,
-    borderColor: '#d6b9ff',
-    borderStyle: 'dashed',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
+    width: 180, height: 180, borderRadius: 90,
+    backgroundColor: '#ede8fa', borderWidth: 3,
+    borderColor: '#d6b9ff', borderStyle: 'dashed',
+    justifyContent: 'center', alignItems: 'center', gap: 12,
   },
   semFotoTexto: {
-    color: '#6b49ad',
-    fontSize: 15,
-    textAlign: 'center',
-    paddingHorizontal: 20,
+    color: '#6b49ad', fontSize: 15,
+    textAlign: 'center', paddingHorizontal: 20,
   },
 })

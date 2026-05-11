@@ -1,20 +1,22 @@
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, TouchableOpacityProps } from 'react-native'
+import { ActivityIndicator, Pressable, StyleSheet, Text, ViewStyle } from 'react-native'
 
-type Props = TouchableOpacityProps & {
+type Props = {
   texto: string
   carregando?: boolean
   variante?: 'primario' | 'secundario'
+  onPress?: () => void
+  disabled?: boolean
+  style?: ViewStyle
 }
 
-export default function BotaoGrande({ texto, carregando, variante = 'primario', ...rest }: Props) {
+export default function BotaoGrande({ texto, carregando, variante = 'primario', onPress, disabled, style }: Props) {
   const isPrimario = variante === 'primario'
 
   return (
-    <TouchableOpacity
-      style={[styles.botao, isPrimario ? styles.primario : styles.secundario]}
-      activeOpacity={0.8}
-      disabled={carregando}
-      {...rest}
+    <Pressable
+      style={[styles.botao, isPrimario ? styles.primario : styles.secundario, style]}
+      onPress={onPress}
+      disabled={carregando || disabled}
     >
       {carregando ? (
         <ActivityIndicator color={isPrimario ? '#fff' : '#3f2b76'} size="small" />
@@ -23,7 +25,7 @@ export default function BotaoGrande({ texto, carregando, variante = 'primario', 
           {texto}
         </Text>
       )}
-    </TouchableOpacity>
+    </Pressable>
   )
 }
 

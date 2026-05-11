@@ -11,11 +11,13 @@ export default function CadastroNome() {
   const [erro, setErro] = useState('')
 
   function avancar() {
+    console.log('avancar chamado, nome:', dados.nome)
     if (dados.nome.trim().length < 2) {
       setErro('Digite seu nome completo')
       return
     }
     setErro('')
+    console.log('indo para cadastro-email')
     router.push('/auth/cadastro-email')
   }
 
@@ -27,7 +29,7 @@ export default function CadastroNome() {
       <TelaEtapa
         titulo="Como você se chama?"
         subtitulo="Seu primeiro nome ou nome completo"
-        onVoltar={() => router.replace('/auth' as any)}
+        onVoltar={() => router.back()}
         etapa={1}
         totalEtapas={4}
       >
