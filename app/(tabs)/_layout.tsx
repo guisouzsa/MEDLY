@@ -3,7 +3,18 @@ import { Tabs } from 'expo-router'
 
 export default function TabsLayout() {
   return (
-    <Tabs screenOptions={{ headerShown: false }}>
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: '#9163cb',
+        tabBarInactiveTintColor: '#aaa',
+        tabBarStyle: { backgroundColor: '#fff', borderTopColor: '#ede8fa' },
+        tabBarLabelStyle: { fontSize: 14, fontWeight: '600' },
+      }}
+    >
+      {/* Esconde o index da tab bar */}
+      <Tabs.Screen name="index" options={{ href: null }} />
+
       <Tabs.Screen
         name="medicamentos"
         options={{

@@ -1,4 +1,5 @@
 import { Feather } from '@expo/vector-icons'
+import * as bcrypt from 'bcryptjs'
 import * as ImagePicker from 'expo-image-picker'
 import { router } from 'expo-router'
 import { useState } from 'react'
@@ -30,65 +31,60 @@ export default function CadastroFoto() {
   }
 
   async function finalizar(pularFoto = false) {
-    if (carregando) return // evita duplo clique
+    if (carregando) return
     setCarregando(true)
 
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: dados.email,
-      password: dados.senha,
-      options: {
-        data: { nome: dados.nome.trim() },
-      },
-    })
+    const { data: existente } = await supabase
+      .from('perfis')
+      .select('id')
+      .eq('email', dados.email.trim())
+      .maybeSingle()
 
-    if (authError) {
+    if (existente) {
       setCarregando(false)
-      let msg = 'Não foi possível criar a conta. Tente novamente.'
-      if (authError.message.includes('already registered')) {
-        msg = 'Este email já está cadastrado.'
-      } else if (authError.status === 429) {
-        msg = 'Muitas tentativas. Aguarde alguns minutos e tente novamente.'
-      }
-      Alert.alert('Erro', msg)
+      Alert.alert('Erro', 'Este email já está cadastrado.')
       return
     }
 
-    const user = authData.session?.user ?? authData.user
+    let fotoUrl: string | null = null
+    if (!pularFoto && dados.fotoUri) {
+      try {
+        const response = await fetch(dados.fotoUri)
+        const blob = await response.blob()
+        const ext = blob.type.split('/')[1] ?? 'jpg'
+        const fileName = `${Date.now()}.${ext}`
 
-    if (!user) {
+        const { data: upload } = await supabase.storage
+          .from('avatares')
+          .upload(fileName, blob, { contentType: blob.type, upsert: true })
+
+        if (upload) {
+          const { data: urlData } = supabase.storage.from('avatares').getPublicUrl(fileName)
+          fotoUrl = urlData.publicUrl
+        }
+      } catch (e) {
+        console.warn('Erro no upload da foto, continuando sem ela.', e)
+      }
+    }
+
+    const senhaCriptografada = await bcrypt.hash(dados.senha, 10)
+
+    const { error } = await supabase.from('perfis').insert({
+      nome: dados.nome.trim(),
+      email: dados.email.trim(),
+      senha: senhaCriptografada,
+      foto_url: fotoUrl,
+    })
+
+    if (error) {
       setCarregando(false)
       Alert.alert('Erro', 'Não foi possível criar a conta. Tente novamente.')
       return
     }
 
-    let fotoUrl: string | null = null
-
-    if (!pularFoto && dados.fotoUri) {
-      const ext = dados.fotoUri.split('.').pop() ?? 'jpg'
-      const fileName = `${user.id}.${ext}`
-      const formData = new FormData()
-      formData.append('file', { uri: dados.fotoUri, name: fileName, type: `image/${ext}` } as any)
-
-      const { data: upload } = await supabase.storage
-        .from('avatares')
-        .upload(fileName, formData, { upsert: true })
-
-      if (upload) {
-        const { data: urlData } = supabase.storage.from('avatares').getPublicUrl(fileName)
-        fotoUrl = urlData.publicUrl
-      }
-    }
-
-    await supabase.from('perfis').upsert({
-      id: user.id,
-      nome: dados.nome.trim(),
-      email: dados.email,
-      foto_url: fotoUrl,
-    })
-
     limpar()
     setCarregando(false)
-    router.replace('/(tabs)' as any)
+    router.replace('/(tabs)/medicamentos' as any) // ✅ corrigido
   }
 
   return (
@@ -116,7 +112,6 @@ export default function CadastroFoto() {
           onPress={() => finalizar(false)}
           carregando={carregando}
         />
-
         <BotaoGrande
           texto="Pular esta etapa"
           variante="secundario"

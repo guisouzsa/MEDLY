@@ -39,7 +39,6 @@ export default function CadastroNome() {
           autoCapitalize="words"
           erro={erro}
         />
-
         <BotaoGrande texto="Continuar" onPress={avancar} />
       </TelaEtapa>
     </KeyboardAvoidingView>
