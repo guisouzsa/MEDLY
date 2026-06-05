@@ -4,13 +4,12 @@ import {
   Dimensions,
   Image,
   Platform,
-  SafeAreaView,
-  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 const { width } = Dimensions.get('window')
 const CARD_W = Math.min(width * 0.88, 420)
@@ -62,7 +61,6 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: '#fff',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   tela: {
     flex: 1,

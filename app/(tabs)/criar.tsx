@@ -1,10 +1,11 @@
 import { Feather } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import {
-    Dimensions, Platform, SafeAreaView,
+    Dimensions, Platform,
     StatusBar, StyleSheet, Text,
     TouchableOpacity, View,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 const { width } = Dimensions.get('window')
 
@@ -46,7 +47,6 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: '#F5F0FF',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   container: {
     flex: 1,

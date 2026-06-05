@@ -8,15 +8,14 @@ import {
     Image,
     KeyboardAvoidingView,
     Platform,
-    SafeAreaView,
     ScrollView,
-    StatusBar,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
     View,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '../../src/lib/supabase'
 
 const { width } = Dimensions.get('window')
@@ -149,7 +148,6 @@ export default function Login() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1, backgroundColor: '#fff',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   flex: { flex: 1 },
   scroll: {

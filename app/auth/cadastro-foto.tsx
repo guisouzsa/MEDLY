@@ -1,12 +1,13 @@
-﻿import { Feather } from '@expo/vector-icons'
+import { Feather } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
 import { router } from 'expo-router'
 import { useState } from 'react'
 import {
-  Dimensions, Image, Platform, SafeAreaView,
-  ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View,
+  Dimensions, Image, Platform,
+  ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import ModalAlerta from '../../src/components/ModalAlerta'
 import { useCadastro } from '../../src/context/CadastroContext'
 import { supabase } from '../../src/lib/supabase'
@@ -78,22 +79,26 @@ export default function CadastroFoto() {
     }
 
     let fotoUrl: string | null = null
-    if (!pularFoto && dados.fotoUri) {
+
+    if (dados.fotoUri && !pularFoto) {
       try {
         const response = await fetch(dados.fotoUri)
         const blob = await response.blob()
         const ext = blob.type.split('/')[1] ?? 'jpg'
         const fileName = `${user.id}.${ext}`
-        const { data: upload } = await supabase.storage.from('avatares')
+        const { data: upload, error: uploadError } = await supabase.storage.from('avatares')
           .upload(fileName, blob, { contentType: blob.type, upsert: true })
+
         if (upload) {
           const { data: urlData } = supabase.storage.from('avatares').getPublicUrl(fileName)
-          fotoUrl = urlData.publicUrl
+          fotoUrl = `${urlData.publicUrl}?t=${Date.now()}`
         }
-      } catch {
-        // Upload falhou silenciosamente — conta é criada sem foto
+      } catch (e) {
+        console.log('CATCH UPLOAD:', e)
       }
     }
+
+
 
     await supabase.from('perfis').upsert({
       id: user.id,
@@ -136,7 +141,7 @@ export default function CadastroFoto() {
             )}
           </TouchableOpacity>
 
-          {dados.fotoUri && (
+          {!!dados.fotoUri && (
             <View style={styles.acoesFoto}>
               <TouchableOpacity style={styles.botaoMudar} onPress={escolherFoto}>
                 <Feather name="image" size={14} color="#6B49AD" />
@@ -178,7 +183,7 @@ export default function CadastroFoto() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
+  safe: { flex: 1, backgroundColor: '#fff' },
   scroll: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 48, backgroundColor: '#fff' },
   voltar: { alignSelf: 'flex-start', marginLeft: 8, marginBottom: 16, padding: 4 },
   centro: { alignItems: 'center', marginBottom: 24 },

@@ -58,13 +58,22 @@ export default function Pesquisar() {
     }
 
     if (filtro === 'todos' || filtro === 'consultas') {
-      const { data } = await supabase.from('consultas').select('id, especialidade, nome_medico, data, status')
-      data?.forEach(c => resultado.push({
-        id: c.id, tipo: 'consultas',
-        titulo: c.especialidade,
-        subtitulo: [c.nome_medico, c.data, c.status].filter(Boolean).join(' · '),
-        icone: 'calendar',
-      }))
+      const { data } = await supabase.from('consultas').select('id, especialidade, nome_medico, data, horario, local')
+      data?.forEach(c => {
+        const dataFormatada = (() => {
+          if (!c.data) return ''
+          const parts = c.data.split('-')
+          if (parts.length < 3) return c.data
+          return `${parts[2]}/${parts[1]}/${parts[0]}`
+        })()
+        const dataHora = [dataFormatada, c.horario].filter(Boolean).join(' às ')
+        resultado.push({
+          id: c.id, tipo: 'consultas',
+          titulo: c.especialidade,
+          subtitulo: [c.nome_medico, dataHora, c.local].filter(Boolean).join(' · '),
+          icone: 'calendar',
+        })
+      })
     }
 
     if (filtro === 'todos' || filtro === 'sintomas') {

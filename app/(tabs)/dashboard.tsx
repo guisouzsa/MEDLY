@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
-import { router } from 'expo-router'
-import { useEffect, useState } from 'react'
+import { router, useFocusEffect } from 'expo-router'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Dimensions, Image, Modal, Platform,
   ScrollView, StatusBar, StyleSheet, Text,
@@ -157,20 +157,30 @@ export default function Dashboard() {
     return () => clearInterval(timer)
   }, [])
 
-  useEffect(() => {
-    async function carregarPerfil() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: perfil } = await supabase
-        .from('perfis')
-        .select('foto_url, nome')
-        .eq('id', user.id)
-        .single()
-      if (perfil?.nome) setNome(perfil.nome)
-      if (perfil?.foto_url) setFotoUri(perfil.foto_url)
-    }
-    carregarPerfil()
-  }, [])
+  useFocusEffect(
+    useCallback(() => {
+      async function carregarPerfil() {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        const { data: perfil } = await supabase
+          .from('perfis')
+          .select('foto_url, nome')
+          .eq('id', user.id)
+          .single()
+        if (perfil) {
+          setNome(perfil.nome ?? '')
+          if (perfil.foto_url) {
+            // Adiciona cache-buster se não tiver
+            const url = perfil.foto_url.includes('?') ? perfil.foto_url : `${perfil.foto_url}?t=${Date.now()}`
+            setFotoUri(url)
+          } else {
+            setFotoUri(null)
+          }
+        }
+      }
+      carregarPerfil()
+    }, [])
+  )
 
   async function sair() {
     await supabase.auth.signOut()
@@ -186,13 +196,22 @@ export default function Dashboard() {
       >
         {/* CARD 1 — header */}
         <View style={styles.card1}>
-          {fotoUri ? (
-            <Image source={{ uri: fotoUri }} style={styles.fotoPerfil} />
-          ) : (
-            <View style={styles.fotoPerfilPlaceholder}>
-              <Feather name="user" size={22} color="#6B49AD" />
-            </View>
-          )}
+          <TouchableOpacity
+            onPress={() => router.push('/modulos/perfil' as any)}
+            activeOpacity={0.85}
+          >
+            {fotoUri ? (
+              <Image
+                source={{ uri: fotoUri }}
+                style={styles.fotoPerfil}
+                onError={(e) => { console.log('DASHBOARD ERRO foto:', e.nativeEvent.error, fotoUri); setFotoUri(null) }}
+              />
+            ) : (
+              <View style={styles.fotoPerfilPlaceholder}>
+                <Feather name="user" size={22} color="#6B49AD" />
+              </View>
+            )}
+          </TouchableOpacity>
           <Image
             source={require('../../assets/images/logo.png')}
             style={styles.logoHeader}
