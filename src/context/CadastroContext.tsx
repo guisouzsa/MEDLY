@@ -1,51 +1,45 @@
 import { createContext, useContext, useState } from 'react'
 
-type CadastroData = {
+type Dados = {
   nome: string
   email: string
   senha: string
-  fotoUri: string | null
+  fotoUri: string
+  erroEmail: string  // ← novo
 }
 
-type CadastroContextType = {
-  dados: CadastroData
+type Ctx = {
+  dados: Dados
   setNome: (v: string) => void
   setEmail: (v: string) => void
   setSenha: (v: string) => void
-  setFotoUri: (v: string | null) => void
+  setFotoUri: (v: string) => void
+  setErroEmail: (v: string) => void 
   limpar: () => void
 }
 
-const CadastroContext = createContext<CadastroContextType | null>(null)
+const CadastroContext = createContext<Ctx>({} as Ctx)
 
-const dadosVazios: CadastroData = {
-  nome: '',
-  email: '',
-  senha: '',
-  fotoUri: null,
-}
+const inicial: Dados = { nome: '', email: '', senha: '', fotoUri: '', erroEmail: '' }
 
 export function CadastroProvider({ children }: { children: React.ReactNode }) {
-  const [dados, setDados] = useState<CadastroData>(dadosVazios)
+  const [dados, setDados] = useState<Dados>(inicial)
 
   return (
-    <CadastroContext.Provider
-      value={{
-        dados,
-        setNome: (nome) => setDados((d) => ({ ...d, nome })),
-        setEmail: (email) => setDados((d) => ({ ...d, email })),
-        setSenha: (senha) => setDados((d) => ({ ...d, senha })),
-        setFotoUri: (fotoUri) => setDados((d) => ({ ...d, fotoUri })),
-        limpar: () => setDados(dadosVazios),
-      }}
-    >
+    <CadastroContext.Provider value={{
+      dados,
+      setNome: (v) => setDados(d => ({ ...d, nome: v })),
+      setEmail: (v) => setDados(d => ({ ...d, email: v })),
+      setSenha: (v) => setDados(d => ({ ...d, senha: v })),
+      setFotoUri: (v) => setDados(d => ({ ...d, fotoUri: v })),
+      setErroEmail: (v) => setDados(d => ({ ...d, erroEmail: v })),  // ← novo
+      limpar: () => setDados(inicial),
+    }}>
       {children}
     </CadastroContext.Provider>
   )
 }
 
 export function useCadastro() {
-  const ctx = useContext(CadastroContext)
-  if (!ctx) throw new Error('useCadastro deve estar dentro de CadastroProvider')
-  return ctx
+  return useContext(CadastroContext)
 }

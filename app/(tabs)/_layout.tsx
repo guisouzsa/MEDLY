@@ -6,23 +6,57 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#9163cb',
+        tabBarActiveTintColor: '#6B49AD',
         tabBarInactiveTintColor: '#aaa',
-        tabBarStyle: { backgroundColor: '#fff', borderTopColor: '#ede8fa' },
-        tabBarLabelStyle: { fontSize: 14, fontWeight: '600' },
+        tabBarStyle: {
+          backgroundColor: '#fff',
+          borderTopWidth: 0,
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+          height: 70,
+          paddingBottom: 10,
+          paddingTop: 8,
+          position: 'absolute',
+          shadowColor: '#6B49AD',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.08,
+          shadowRadius: 12,
+          elevation: 12,
+        },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}
     >
-      {/* Esconde o index da tab bar */}
-      <Tabs.Screen name="index" options={{ href: null }} />
-
       <Tabs.Screen
-        name="medicamentos"
+        name="index"
         options={{
-          title: 'Medicamentos',
-          tabBarIcon: ({ color }) => (
-            <Feather name="activity" size={24} color={color} />
-          ),
+          title: 'Início',
+          tabBarIcon: ({ color }) => <Feather name="home" size={24} color={color} />,
         }}
+      />
+      <Tabs.Screen
+        name="pesquisar"
+        options={{
+          title: 'Pesquisar',
+          tabBarIcon: ({ color }) => <Feather name="search" size={24} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="criar"
+        options={{
+          title: 'Criar',
+          tabBarIcon: ({ color }) => <Feather name="plus-circle" size={24} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="calendario"
+        options={{
+          title: 'Calendário',
+          tabBarIcon: ({ color }) => <Feather name="calendar" size={24} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="dashboard"
+        options={{ href: null }}
       />
     </Tabs>
   )

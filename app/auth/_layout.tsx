@@ -1,26 +1,15 @@
-import { Feather } from '@expo/vector-icons'
-import { Tabs } from 'expo-router'
+import { Stack } from 'expo-router'
+import { CadastroProvider } from '../../src/context/CadastroContext'
 
-export default function TabsLayout() {
+export default function AuthLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: '#9163cb',
-        tabBarInactiveTintColor: '#aaa',
-        tabBarStyle: { backgroundColor: '#fff', borderTopColor: '#ede8fa' },
-        tabBarLabelStyle: { fontSize: 14, fontWeight: '600' },
-      }}
-    >
-      <Tabs.Screen
-        name="medicamentos"
-        options={{
-          title: 'Medicamentos',
-          tabBarIcon: ({ color }) => (
-            <Feather name="activity" size={24} color={color} />
-          ),
-        }}
-      />
-    </Tabs>
+    <CadastroProvider>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="login" />
+        <Stack.Screen name="cadastro" />
+        <Stack.Screen name="cadastro-foto" />
+      </Stack>
+    </CadastroProvider>
   )
 }
