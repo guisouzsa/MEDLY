@@ -1,23 +1,22 @@
 import { Feather } from '@expo/vector-icons'
-import { LinearGradient } from 'expo-linear-gradient'
-import { router, useLocalSearchParams, useFocusEffect } from 'expo-router'
+import { decode } from 'base64-arraybuffer'
 import * as DocumentPicker from 'expo-document-picker'
 import * as FileSystem from 'expo-file-system/legacy'
-import { decode } from 'base64-arraybuffer'
+import { LinearGradient } from 'expo-linear-gradient'
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
+import * as WebBrowser from 'expo-web-browser'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  Alert,
   Animated, Dimensions, Image, KeyboardAvoidingView, Modal,
   Platform, ScrollView, StyleSheet, Text, TextInput,
-  TouchableOpacity, View,
+  TouchableOpacity, View
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { supabase } from '../../src/lib/supabase'
+import ModalAlerta from '../../src/components/ModalAlerta'
 import { salvarHistorico } from '../../src/lib/events'
+import { supabase } from '../../src/lib/supabase'
 
 const { height } = Dimensions.get('window')
-
-// ─── Tipos ────────────────────────────────────────────────────────────────────
 
 type Exame = {
   id: number
@@ -27,8 +26,6 @@ type Exame = {
   local: string | null
   arquivo_url: string | null
 }
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function isImageUrl(url: string) {
   if (!url) return false
@@ -66,8 +63,6 @@ function mascaraData(texto: string): string {
   if (n.length <= 4) return `${n.slice(0, 2)}/${n.slice(2)}`
   return `${n.slice(0, 2)}/${n.slice(2, 4)}/${n.slice(4)}`
 }
-
-// ─── Componentes internos ─────────────────────────────────────────────────────
 
 function Campo({
   label, value, onChangeText, placeholder,
@@ -115,8 +110,6 @@ function Campo({
   )
 }
 
-// ─── Tela principal ───────────────────────────────────────────────────────────
-
 export default function Exames() {
   const { action } = useLocalSearchParams()
 
@@ -129,7 +122,6 @@ export default function Exames() {
   const [editando, setEditando] = useState<Exame | null>(null)
   const slideAnim = useRef(new Animated.Value(height)).current
 
-  // ── Campos do form ────────────────────────────────────────────────────────
   const [nome, setNome] = useState('')
   const [dataRealizacao, setDataRealizacao] = useState('')
   const [dataResultado, setDataResultado] = useState('')
@@ -142,7 +134,8 @@ export default function Exames() {
   const [excluirId, setExcluirId] = useState<number | null>(null)
   const [erros, setErros] = useState<Record<string, boolean>>({})
 
-  // ── Init ──────────────────────────────────────────────────────────────────
+  const [modalAlerta, setModalAlerta] = useState({ visivel: false, titulo: '', mensagem: '' })
+  const [modalImagemUrl, setModalImagemUrl] = useState<string | null>(null)
 
   useFocusEffect(
     useCallback(() => {
@@ -176,8 +169,6 @@ export default function Exames() {
     if (action === 'create') abrirModal()
   }, [action])
 
-  // ── Buscar ────────────────────────────────────────────────────────────────
-
   async function buscar(uid?: string) {
     const id = uid ?? usuarioId
     if (!id) return
@@ -189,8 +180,6 @@ export default function Exames() {
     if (error) { console.error('Erro ao buscar:', error.message); return }
     if (rows) setLista(rows as Exame[])
   }
-
-  // ── Modal ─────────────────────────────────────────────────────────────────
 
   function resetForm() {
     setNome('')
@@ -231,15 +220,13 @@ export default function Exames() {
       .start(() => setModalVisivel(false))
   }
 
-  // ── Validação ─────────────────────────────────────────────────────────────
-
   function validar(): boolean {
     const novosErros: Record<string, boolean> = {}
     if (!nome.trim()) novosErros.nome = true
     if (!dataRealizacao || dataRealizacao.length < 10) novosErros.dataRealizacao = true
     setErros(novosErros)
     if (Object.keys(novosErros).length > 0) {
-      Alert.alert('Campos obrigatórios', 'Preencha todos os campos destacados antes de continuar.')
+      setModalAlerta({ visivel: true, titulo: 'Campos obrigatórios', mensagem: 'Preencha todos os campos destacados antes de continuar.' })
       return false
     }
     return true
@@ -257,15 +244,17 @@ export default function Exames() {
       }
     } catch (err) {
       console.error('Erro ao escolher arquivo:', err)
-      Alert.alert('Erro', 'Não foi possível selecionar o arquivo.')
+      setModalAlerta({ visivel: true, titulo: 'Erro', mensagem: 'Não foi possível selecionar o arquivo.' })
     }
   }
 
-  // ── Salvar ────────────────────────────────────────────────────────────────
-
   async function salvar() {
     if (!validar()) return
-    if (!usuarioId) { Alert.alert('Erro', 'Usuário não autenticado.'); router.replace('/auth'); return }
+    if (!usuarioId) {
+      setModalAlerta({ visivel: true, titulo: 'Erro', mensagem: 'Usuário não autenticado.' })
+      router.replace('/auth')
+      return
+    }
 
     setCarregando(true)
     try {
@@ -273,11 +262,10 @@ export default function Exames() {
 
       if (urlFinal && !urlFinal.startsWith('http')) {
         const fileContent = await FileSystem.readAsStringAsync(urlFinal, { encoding: FileSystem.EncodingType.Base64 })
-        
-        // Determina extensão baseada no nome original do arquivo
-        const parts = arquivoNome.split('.')
-        const extRaw = parts.length > 1 ? parts.pop()?.toLowerCase() : 'pdf'
-        const ext = ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp'].includes(extRaw || '') ? extRaw : 'pdf'
+
+        const partsNome = arquivoNome.split('.')
+        const extRaw = partsNome.length > 1 ? partsNome.pop()?.toLowerCase() ?? 'pdf' : 'pdf'
+        const ext = ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp'].includes(extRaw) ? extRaw : 'pdf'
         const fileName = `${usuarioId}_${Date.now()}.${ext}`
 
         let contentType = 'application/octet-stream'
@@ -291,8 +279,8 @@ export default function Exames() {
           contentType,
           upsert: true,
         })
-        if (uploadError) throw new Error('Falha no upload do arquivo.')
-        
+        if (uploadError) throw new Error(`Falha no upload: ${uploadError.message} | ${JSON.stringify(uploadError)}`)
+
         const { data: { publicUrl } } = supabase.storage.from('exames_arquivos').getPublicUrl(fileName)
         urlFinal = publicUrl
       }
@@ -309,24 +297,22 @@ export default function Exames() {
       if (editando) {
         const { error } = await supabase.from('exames').update(payload).eq('id', editando.id)
         if (error) throw error
-        await salvarHistorico(usuarioId, `Exame ${nome.trim()} foi alterado`)
+        await salvarHistorico(usuarioId, `Exame ${nome.trim()} foi alterado`, 'exame')
       } else {
         const { error } = await supabase.from('exames').insert(payload)
         if (error) throw error
-        await salvarHistorico(usuarioId, `Exame ${nome.trim()} foi cadastrado`)
+        await salvarHistorico(usuarioId, `Exame ${nome.trim()} foi cadastrado`, 'exame')
       }
 
       fecharModal()
       await buscar()
     } catch (err: any) {
       console.error('Erro ao salvar:', err.message)
-      Alert.alert('Erro ao salvar', err.message ?? 'Tente novamente.')
+      setModalAlerta({ visivel: true, titulo: 'Erro ao salvar', mensagem: err.message ?? 'Tente novamente.' })
     } finally {
       setCarregando(false)
     }
   }
-
-  // ── Excluir ───────────────────────────────────────────────────────────────
 
   function confirmarExcluir(id: number) { setExcluirId(id); setModalExcluir(true) }
 
@@ -334,22 +320,19 @@ export default function Exames() {
     if (!excluirId) return
     const exa = lista.find(e => e.id === excluirId)
     const { error } = await supabase.from('exames').delete().eq('id', excluirId)
-    if (error) { Alert.alert('Erro ao excluir', error.message); return }
+    if (error) { setModalAlerta({ visivel: true, titulo: 'Erro ao excluir', mensagem: error.message }); return }
     if (exa) {
-      await salvarHistorico(usuarioId!, `Exame ${exa.nome} foi removido`)
+      await salvarHistorico(usuarioId!, `Exame ${exa.nome} foi removido`, 'exame')
     }
     setModalExcluir(false)
     setExcluirId(null)
     await buscar()
   }
 
-  // ── Render principal ──────────────────────────────────────────────────────
-
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}>
 
-        {/* Card 1 — Perfil + Logo */}
         <View style={styles.cardPerfil}>
           <TouchableOpacity onPress={() => router.push('/modulos/perfil' as any)} activeOpacity={0.85}>
             {perfilFoto ? (
@@ -366,7 +349,6 @@ export default function Exames() {
           </TouchableOpacity>
         </View>
 
-        {/* Card 2 — Título */}
         <LinearGradient
           colors={['#6B49AD', '#6843B1', '#481D94']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
@@ -375,7 +357,6 @@ export default function Exames() {
           <Text style={styles.cardTituloTexto}>EXAMES</Text>
         </LinearGradient>
 
-        {/* Botões abaixo do card EXAMES */}
         <View style={styles.botoesAcao}>
           <TouchableOpacity
             onPress={() => router.push({ pathname: '/modulos/historico', params: { modulo: 'exame' } } as any)}
@@ -398,7 +379,6 @@ export default function Exames() {
           </TouchableOpacity>
         </View>
 
-        {/* Card 3 — Lista */}
         <View style={styles.cardLista}>
           {lista.length === 0 ? (
             <View style={styles.vazioContainer}>
@@ -409,89 +389,77 @@ export default function Exames() {
               <Text style={styles.vazioSub}>Toque em "Cadastrar" para adicionar</Text>
             </View>
           ) : (
-            lista.map((exame) => {
-              return (
-                <View key={exame.id} style={styles.card}>
-                  <View style={styles.cardTopo}>
-                    <LinearGradient
-                      colors={['#6B49AD', '#481D94']}
-                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                      style={styles.cardIconeBox}
-                    >
-                      <Feather name="file-text" size={22} color="#fff" />
-                    </LinearGradient>
-                    <View style={styles.cardTextos}>
-                      <Text style={styles.cardNome}>{exame.nome}</Text>
-                    </View>
-                    <View style={styles.cardAcoes}>
-                      <TouchableOpacity style={styles.btnEditar} onPress={() => abrirModal(exame)}>
-                        <Feather name="edit-2" size={17} color="#6B49AD" />
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.btnExcluirCard} onPress={() => confirmarExcluir(exame.id)}>
-                        <Feather name="trash-2" size={17} color="#dc2626" />
-                      </TouchableOpacity>
-                    </View>
+            lista.map((exame) => (
+              <View key={exame.id} style={styles.card}>
+                <View style={styles.cardTopo}>
+                  <LinearGradient
+                    colors={['#6B49AD', '#481D94']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={styles.cardIconeBox}
+                  >
+                    <Feather name="file-text" size={22} color="#fff" />
+                  </LinearGradient>
+                  <View style={styles.cardTextos}>
+                    <Text style={styles.cardNome}>{exame.nome}</Text>
                   </View>
-
-                  <View style={styles.cardInfoRow}>
-                    {exame.data_realizacao ? (
-                      <View style={styles.infoItem}>
-                        <Feather name="calendar" size={13} color="#6B49AD" />
-                        <Text style={styles.infoTexto}>{formatarDataParaTela(exame.data_realizacao)}</Text>
-                      </View>
-                    ) : null}
-                    {exame.data_resultado ? (
-                      <View style={styles.infoItem}>
-                        <Feather name="check-circle" size={13} color="#6B49AD" />
-                        <Text style={styles.infoTexto}>Resultado: {formatarDataParaTela(exame.data_resultado)}</Text>
-                      </View>
-                    ) : null}
-                    {exame.local ? (
-                      <View style={styles.infoItem}>
-                        <Feather name="map-pin" size={13} color="#6B49AD" />
-                        <Text style={styles.infoTexto}>{exame.local}</Text>
-                      </View>
-                    ) : null}
-                    {exame.arquivo_url ? (
-                      <TouchableOpacity
-                        onPress={() => {
-                          if (exame.arquivo_url) {
-                            import('expo-web-browser').then(wb => wb.openBrowserAsync(exame.arquivo_url!))
-                          }
-                        }}
-                        style={[styles.infoItem, { opacity: 0.85 }]}
-                        activeOpacity={0.7}
-                      >
-                        <Feather name="paperclip" size={13} color="#6B49AD" />
-                        <Text style={[styles.infoTexto, { textDecorationLine: 'underline', color: '#481D94' }]}>
-                          Ver arquivo ({isImageUrl(exame.arquivo_url) ? 'Imagem' : 'PDF'})
-                        </Text>
-                      </TouchableOpacity>
-                    ) : null}
-                    {exame.arquivo_url && isImageUrl(exame.arquivo_url) && (
-                      <TouchableOpacity
-                        onPress={() => {
-                          if (exame.arquivo_url) {
-                            import('expo-web-browser').then(wb => wb.openBrowserAsync(exame.arquivo_url!))
-                          }
-                        }}
-                        activeOpacity={0.85}
-                        style={styles.cardThumbnailContainer}
-                      >
-                        <Image source={{ uri: exame.arquivo_url }} style={styles.cardThumbnail} />
-                      </TouchableOpacity>
-                    )}
+                  <View style={styles.cardAcoes}>
+                    <TouchableOpacity style={styles.btnEditar} onPress={() => abrirModal(exame)}>
+                      <Feather name="edit-2" size={17} color="#6B49AD" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.btnExcluirCard} onPress={() => confirmarExcluir(exame.id)}>
+                      <Feather name="trash-2" size={17} color="#dc2626" />
+                    </TouchableOpacity>
                   </View>
                 </View>
-              )
-            })
+
+                <View style={styles.cardInfoRow}>
+                  {exame.data_realizacao ? (
+                    <View style={styles.infoItem}>
+                      <Feather name="calendar" size={13} color="#6B49AD" />
+                      <Text style={styles.infoTexto}>{formatarDataParaTela(exame.data_realizacao)}</Text>
+                    </View>
+                  ) : null}
+                  {exame.data_resultado ? (
+                    <View style={styles.infoItem}>
+                      <Feather name="check-circle" size={13} color="#6B49AD" />
+                      <Text style={styles.infoTexto}>Resultado: {formatarDataParaTela(exame.data_resultado)}</Text>
+                    </View>
+                  ) : null}
+                  {exame.local ? (
+                    <View style={styles.infoItem}>
+                      <Feather name="map-pin" size={13} color="#6B49AD" />
+                      <Text style={styles.infoTexto}>{exame.local}</Text>
+                    </View>
+                  ) : null}
+                </View>
+
+                {exame.arquivo_url ? (
+                  <View style={styles.arquivoContainer}>
+                    {isImageUrl(exame.arquivo_url) ? (
+                      <TouchableOpacity onPress={() => setModalImagemUrl(exame.arquivo_url!)} activeOpacity={0.85}>
+                        <Image source={{ uri: exame.arquivo_url }} style={styles.cardThumbnail} />
+                      </TouchableOpacity>
+                    ) : null}
+                    <TouchableOpacity
+                      onPress={() => WebBrowser.openBrowserAsync(exame.arquivo_url!)}
+                      style={styles.btnVerDocumento}
+                      activeOpacity={0.8}
+                    >
+                      <Feather name="paperclip" size={13} color="#6B49AD" />
+                      <Text style={styles.btnVerDocumentoTexto}>
+                        {isImageUrl(exame.arquivo_url) ? 'Ver imagem em tamanho real' : 'Ver documento (PDF)'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+              </View>
+            ))
           )}
           <View style={{ height: 32 }} />
         </View>
 
       </ScrollView>
 
-      {/* ── Modal cadastro/edição ── */}
       <Modal visible={modalVisivel} transparent animationType="none">
         <KeyboardAvoidingView
           style={styles.modalFundo}
@@ -559,7 +527,9 @@ export default function Exames() {
                 {arquivoUrl ? (
                   <View style={styles.previewContainer}>
                     {isImageUrl(arquivoUrl) ? (
-                      <Image source={{ uri: arquivoUrl }} style={styles.previewImage} resizeMode="cover" />
+                      <TouchableOpacity onPress={() => setModalImagemUrl(arquivoUrl)} activeOpacity={0.85}>
+                        <Image source={{ uri: arquivoUrl }} style={styles.previewImage} resizeMode="cover" />
+                      </TouchableOpacity>
                     ) : (
                       <View style={styles.pdfIconeBox}>
                         <Feather name="file-text" size={30} color="#dc2626" />
@@ -570,6 +540,12 @@ export default function Exames() {
                       <Text style={styles.previewNome} numberOfLines={1}>
                         {arquivoNome || 'Arquivo selecionado'}
                       </Text>
+                      {!isImageUrl(arquivoUrl) && arquivoUrl.startsWith('http') && (
+                        <TouchableOpacity onPress={() => WebBrowser.openBrowserAsync(arquivoUrl)} style={styles.removerArquivoBtn}>
+                          <Feather name="eye" size={14} color="#6B49AD" />
+                          <Text style={[styles.removerArquivoTexto, { color: '#6B49AD' }]}>Ver documento</Text>
+                        </TouchableOpacity>
+                      )}
                       <TouchableOpacity onPress={() => { setArquivoUrl(''); setArquivoNome('') }} style={styles.removerArquivoBtn}>
                         <Feather name="trash-2" size={14} color="#dc2626" />
                         <Text style={styles.removerArquivoTexto}>Remover arquivo</Text>
@@ -606,7 +582,6 @@ export default function Exames() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ── Modal excluir ── */}
       <Modal visible={modalExcluir} transparent animationType="fade">
         <View style={styles.modalExcluirFundo}>
           <View style={styles.modalExcluirCard}>
@@ -625,11 +600,37 @@ export default function Exames() {
         </View>
       </Modal>
 
+      <Modal visible={!!modalImagemUrl} transparent animationType="fade">
+        <TouchableOpacity
+          style={styles.modalImagemFundo}
+          onPress={() => setModalImagemUrl(null)}
+          activeOpacity={1}
+        >
+          <TouchableOpacity activeOpacity={1} style={styles.modalImagemContainer}>
+            <TouchableOpacity onPress={() => setModalImagemUrl(null)} style={styles.modalImagemFechar}>
+              <Feather name="x" size={22} color="#fff" />
+            </TouchableOpacity>
+            {modalImagemUrl ? (
+              <Image
+                source={{ uri: modalImagemUrl }}
+                style={styles.modalImagemFull}
+                resizeMode="contain"
+              />
+            ) : null}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      <ModalAlerta
+        visivel={modalAlerta.visivel}
+        titulo={modalAlerta.titulo}
+        mensagem={modalAlerta.mensagem}
+        onFechar={() => setModalAlerta(p => ({ ...p, visivel: false }))}
+      />
+
     </SafeAreaView>
   )
 }
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F5F0FF' },
@@ -722,6 +723,18 @@ const styles = StyleSheet.create({
   },
   infoTexto: { fontSize: 13, color: '#6B49AD', fontWeight: '600' },
 
+  arquivoContainer: { gap: 8 },
+  cardThumbnail: {
+    width: '100%', height: 160, borderRadius: 12,
+    borderWidth: 1, borderColor: '#E2D9F3',
+  },
+  btnVerDocumento: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#F0EAFF', borderRadius: 20,
+    paddingHorizontal: 14, paddingVertical: 8, alignSelf: 'flex-start',
+  },
+  btnVerDocumentoTexto: { fontSize: 13, color: '#481D94', fontWeight: '700' },
+
   modalFundo: { flex: 1 },
   modalOverlay: { flex: 1, backgroundColor: '#00000055' },
   modalCard: {
@@ -802,68 +815,35 @@ const styles = StyleSheet.create({
   btnExcluirConfirmarTexto: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 2 },
   btnCancelar: { paddingVertical: 14 },
   btnCancelarTexto: { fontSize: 15, fontWeight: '600', color: '#9163CB' },
+
   previewContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FAFAFE',
-    borderRadius: 20,
-    padding: 12,
-    borderWidth: 1.5,
-    borderColor: '#C4B5FD',
-    gap: 12,
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#FAFAFE', borderRadius: 20, padding: 12,
+    borderWidth: 1.5, borderColor: '#C4B5FD', gap: 12,
   },
   previewImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2D9F3',
+    width: 60, height: 60, borderRadius: 12,
+    borderWidth: 1, borderColor: '#E2D9F3',
   },
   pdfIconeBox: {
-    width: 60,
-    height: 60,
-    borderRadius: 12,
-    backgroundColor: '#FFEBEE',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 60, height: 60, borderRadius: 12,
+    backgroundColor: '#FFEBEE', justifyContent: 'center', alignItems: 'center',
   },
-  pdfIconeTexto: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#dc2626',
-    marginTop: 2,
+  pdfIconeTexto: { fontSize: 9, fontWeight: '800', color: '#dc2626', marginTop: 2 },
+  previewDetalhes: { flex: 1, justifyContent: 'center', gap: 6 },
+  previewNome: { fontSize: 14, fontWeight: '700', color: '#301971' },
+  removerArquivoBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  removerArquivoTexto: { fontSize: 12, fontWeight: '700', color: '#dc2626' },
+
+  modalImagemFundo: {
+    flex: 1, backgroundColor: '#000000CC',
+    justifyContent: 'center', alignItems: 'center',
   },
-  previewDetalhes: {
-    flex: 1,
-    justifyContent: 'center',
-    gap: 6,
+  modalImagemContainer: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
+  modalImagemFechar: {
+    position: 'absolute', top: 50, right: 20,
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: '#00000066', justifyContent: 'center', alignItems: 'center', zIndex: 10,
   },
-  previewNome: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#301971',
-  },
-  removerArquivoBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  removerArquivoTexto: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#dc2626',
-  },
-  cardThumbnailContainer: {
-    marginTop: 8,
-    borderRadius: 12,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#E2D9F3',
-    width: 120,
-    height: 80,
-  },
-  cardThumbnail: {
-    width: '100%',
-    height: '100%',
-  },
+  modalImagemFull: { width: '95%', height: '80%' },
 })
