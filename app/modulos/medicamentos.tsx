@@ -1,19 +1,18 @@
 import { Feather } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
-import { router, useLocalSearchParams, useFocusEffect } from 'expo-router'
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  Alert,
   Animated, Dimensions, Image, KeyboardAvoidingView, Modal,
   Platform, ScrollView, StyleSheet, Text, TextInput,
   TouchableOpacity, View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import ModalAlerta from '../../src/components/ModalAlerta'
 import { supabase } from '../../src/lib/supabase'
 
 const { height } = Dimensions.get('window')
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
 
 type Horario = {
   id: number
@@ -30,13 +29,13 @@ type Medicamento = {
   intervalo_horas: number | null
   data_inicio: string
   data_termino: string | null
+  data_retorno: string | null
   quantidade_por_dose: string
   observacoes: string
   status: 'ativo' | 'pausado' | 'encerrado'
+  motivo_encerramento: string | null
   medicamento_horarios: Horario[]
 }
-
-// ─── Constantes ───────────────────────────────────────────────────────────────
 
 const DIAS_SEMANA = [
   { label: 'Seg', valor: 1 },
@@ -48,7 +47,6 @@ const DIAS_SEMANA = [
   { label: 'Dom', valor: 0 },
 ]
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function converterData(data: string): string | null {
   if (!data || data.length < 10) return null
@@ -87,8 +85,9 @@ function dataEhPassada(data: string): boolean {
 
 function tagStatusCor(status: string) {
   if (status === 'ativo') return { bg: '#DCFCE7', cor: '#16A34A' }
-  if (status === 'pausado') return { bg: '#FEF9C3', cor: '#CA8A04' }
-  return { bg: '#F1F5F9', cor: '#64748B' }
+  if (status === 'pausado') return { bg: '#EDE8FA', cor: '#481D94' }
+  if (status === 'encerrado') return { bg: '#EDE8FA', cor: '#481D94' }
+  return { bg: '#EDE8FA', cor: '#481D94' }
 }
 
 function labelFrequencia(med: Medicamento): string {
@@ -99,11 +98,10 @@ function labelFrequencia(med: Medicamento): string {
   return med.frequencia_tipo
 }
 
-// ─── Componentes internos ─────────────────────────────────────────────────────
 
 function Campo({
   label, value, onChangeText, placeholder, keyboardType = 'default' as any,
-  opcional = false, dica, obrigatorio = false, erro,
+  opcional = false, dica, erro, erroTexto, obrigatorio = false,
 }: {
   label: string
   value: string
@@ -114,19 +112,16 @@ function Campo({
   obrigatorio?: boolean
   dica?: string
   erro?: boolean
+  erroTexto?: string
 }) {
   return (
     <View style={styles.campoWrapper}>
       <View style={styles.campoLabelRow}>
         <Text style={styles.campoLabel}>{label}</Text>
+        {obrigatorio && <Text style={styles.asterisco}>*</Text>}
         {opcional && (
           <View style={styles.tagOpcional}>
             <Text style={styles.tagOpcionalTexto}>opcional</Text>
-          </View>
-        )}
-        {obrigatorio && (
-          <View style={styles.tagObrigatorio}>
-            <Text style={styles.tagObrigatorioTexto}>obrigatório</Text>
           </View>
         )}
       </View>
@@ -142,13 +137,14 @@ function Campo({
       {erro && (
         <View style={styles.erroRow}>
           <Feather name="alert-circle" size={13} color="#dc2626" />
-          <Text style={styles.erroTexto}>Este campo é obrigatório</Text>
+          <Text style={styles.erroTexto}>{erroTexto ?? 'Este campo é obrigatório'}</Text>
         </View>
       )}
       {dica && !erro && <Text style={styles.dicaTexto}>{dica}</Text>}
     </View>
   )
 }
+
 
 function SeletorOpcoes<T extends string>({
   label, opcoes, value, onChange,
@@ -178,15 +174,10 @@ function SeletorOpcoes<T extends string>({
   )
 }
 
-// ─── Componente de grupo de horários ─────────────────────────────────────────
 
 function GrupoHorarios({
-  horarios,
-  onAdicionar,
-  onRemover,
-  onAtualizar,
-  label = 'HORÁRIOS',
-  descricao,
+  horarios, onAdicionar, onRemover, onAtualizar,
+  label = 'HORÁRIOS', descricao, erro,
 }: {
   horarios: string[]
   onAdicionar: () => void
@@ -194,6 +185,7 @@ function GrupoHorarios({
   onAtualizar: (i: number, v: string) => void
   label?: string
   descricao?: string
+  erro?: boolean
 }) {
   return (
     <View style={styles.campoWrapper}>
@@ -206,8 +198,8 @@ function GrupoHorarios({
       )}
       {horarios.map((h, index) => (
         <View key={index} style={styles.horarioRow}>
-          <View style={styles.horarioInputWrapper}>
-            <Feather name="clock" size={16} color="#9163CB" style={styles.horarioIcIcoe} />
+          <View style={[styles.horarioInputWrapper, erro && h.length < 5 && styles.horarioInputErro]}>
+            <Feather name="clock" size={16} color="#9163CB" style={styles.horarioIcoe} />
             <TextInput
               style={styles.inputHorario}
               value={h}
@@ -225,6 +217,12 @@ function GrupoHorarios({
           )}
         </View>
       ))}
+      {erro && (
+        <View style={styles.erroRow}>
+          <Feather name="alert-circle" size={13} color="#dc2626" />
+          <Text style={styles.erroTexto}>Informe pelo menos um horário válido</Text>
+        </View>
+      )}
       <TouchableOpacity onPress={onAdicionar} style={styles.btnAdicionarHorario}>
         <Feather name="plus" size={16} color="#6B49AD" />
         <Text style={styles.btnAdicionarTexto}>Adicionar horário</Text>
@@ -233,7 +231,6 @@ function GrupoHorarios({
   )
 }
 
-// ─── Tela principal ───────────────────────────────────────────────────────────
 
 export default function Medicamentos() {
   const { abrir } = useLocalSearchParams()
@@ -241,42 +238,39 @@ export default function Medicamentos() {
   const [usuarioId, setUsuarioId] = useState<string | null>(null)
   const [lista, setLista] = useState<Medicamento[]>([])
   const [perfilFoto, setPerfilFoto] = useState<string | null>(null)
-  const [perfilNome, setPerfilNome] = useState<string>('')
 
   const [modalVisivel, setModalVisivel] = useState(false)
   const [editando, setEditando] = useState<Medicamento | null>(null)
   const slideAnim = useRef(new Animated.Value(height)).current
 
-  // ── Campos do form ────────────────────────────────────────────────────────
   const [nome, setNome] = useState('')
   const [dosagem, setDosagem] = useState('')
   const [frequenciaTipo, setFrequenciaTipo] = useState<Medicamento['frequencia_tipo']>('diario')
   const [intervaloHoras, setIntervaloHoras] = useState('')
   const [dataInicio, setDataInicio] = useState('')
   const [dataTermino, setDataTermino] = useState('')
+  const [dataRetorno, setDataRetorno] = useState('')
   const [quantidadePorDose, setQuantidadePorDose] = useState('')
   const [observacoes, setObservacoes] = useState('')
   const [status, setStatus] = useState<Medicamento['status']>('ativo')
+  const [motivoEncerramento, setMotivoEncerramento] = useState('')
 
-  // Diário: múltiplos horários
   const [horarios, setHorarios] = useState<string[]>([''])
-
-  // Semanal: dias + horários por dia selecionado
   const [diasSemanaSelecionados, setDiasSemanaSelecionados] = useState<number[]>([])
   const [horariosSemanal, setHorariosSemanal] = useState<string[]>([''])
-
-  // Mensal: dias + horários
   const [diasMesSelecionados, setDiasMesSelecionados] = useState<number[]>([])
   const [horariosMensal, setHorariosMensal] = useState<string[]>([''])
 
   const [carregando, setCarregando] = useState(false)
-  const [modalExcluir, setModalExcluir] = useState(false)
-  const [excluirId, setExcluirId] = useState<number | null>(null)
-
-  // Erros de validação por campo
   const [erros, setErros] = useState<Record<string, boolean>>({})
 
-  // ── Init ──────────────────────────────────────────────────────────────────
+  const [modalExcluir, setModalExcluir] = useState(false)
+  const [excluirId, setExcluirId] = useState<number | null>(null)
+  const [modalAlerta, setModalAlerta] = useState({ visivel: false, titulo: '', mensagem: '' })
+  const [modalSucesso, setModalSucesso] = useState({ visivel: false, titulo: '', mensagem: '' })
+
+  const [modalPausar, setModalPausar] = useState(false)
+
 
   useEffect(() => {
     if (abrir === 'true') abrirModal()
@@ -288,30 +282,20 @@ export default function Medicamentos() {
         const { data: { user }, error } = await supabase.auth.getUser()
         if (error || !user) { router.replace('/auth'); return }
         setUsuarioId(user.id)
-
-        // Busca perfil
         const { data: perfil } = await supabase
-          .from('perfis')
-          .select('nome, foto_url')
-          .eq('id', user.id)
-          .single()
-        if (perfil) {
-          setPerfilNome(perfil.nome ?? '')
-          if (perfil.foto_url) {
-            const url = perfil.foto_url.includes('?') ? perfil.foto_url : `${perfil.foto_url}?t=${Date.now()}`
-            setPerfilFoto(url)
-          } else {
-            setPerfilFoto(null)
-          }
+          .from('perfis').select('foto_url').eq('id', user.id).single()
+        if (perfil?.foto_url) {
+          const url = perfil.foto_url.includes('?') ? perfil.foto_url : `${perfil.foto_url}?t=${Date.now()}`
+          setPerfilFoto(url)
+        } else {
+          setPerfilFoto(null)
         }
-
         await buscar(user.id)
       }
       init()
     }, [])
   )
 
-  // ── Buscar ────────────────────────────────────────────────────────────────
 
   async function buscar(uid?: string) {
     const id = uid ?? usuarioId
@@ -325,23 +309,13 @@ export default function Medicamentos() {
     if (data) setLista(data as Medicamento[])
   }
 
-  // ── Modal ─────────────────────────────────────────────────────────────────
-
   function resetForm() {
-    setNome('')
-    setDosagem('')
-    setFrequenciaTipo('diario')
-    setIntervaloHoras('')
-    setDataInicio('')
-    setDataTermino('')
-    setQuantidadePorDose('')
-    setObservacoes('')
-    setStatus('ativo')
-    setHorarios([''])
-    setDiasSemanaSelecionados([])
-    setHorariosSemanal([''])
-    setDiasMesSelecionados([])
-    setHorariosMensal([''])
+    setNome(''); setDosagem(''); setFrequenciaTipo('diario')
+    setIntervaloHoras(''); setDataInicio(''); setDataTermino('')
+    setDataRetorno(''); setQuantidadePorDose(''); setObservacoes('')
+    setStatus('ativo'); setMotivoEncerramento(''); setHorarios([''])
+    setDiasSemanaSelecionados([]); setHorariosSemanal([''])
+    setDiasMesSelecionados([]); setHorariosMensal([''])
     setErros({})
   }
 
@@ -354,47 +328,38 @@ export default function Medicamentos() {
       setIntervaloHoras(med.intervalo_horas?.toString() ?? '')
       setDataInicio(med.data_inicio ? formatarDataParaTela(med.data_inicio) : '')
       setDataTermino(med.data_termino ? formatarDataParaTela(med.data_termino) : '')
+      setDataRetorno(med.data_retorno ? formatarDataParaTela(med.data_retorno) : '')
       setQuantidadePorDose(med.quantidade_por_dose ?? '')
       setObservacoes(med.observacoes ?? '')
       setStatus(med.status)
+      setMotivoEncerramento(med.motivo_encerramento ?? '')
       setErros({})
 
       const hs = med.medicamento_horarios ?? []
-
       if (med.frequencia_tipo === 'diario') {
         setHorarios(hs.length > 0 ? hs.map(h => h.horario.slice(0, 5)) : [''])
-        setDiasSemanaSelecionados([])
-        setHorariosSemanal([''])
-        setDiasMesSelecionados([])
-        setHorariosMensal([''])
+        setDiasSemanaSelecionados([]); setHorariosSemanal([''])
+        setDiasMesSelecionados([]); setHorariosMensal([''])
       } else if (med.frequencia_tipo === 'semanal') {
         setHorarios([''])
         const diasUnicos = [...new Set(hs.map(h => h.dia_semana).filter(d => d !== null) as number[])]
         setDiasSemanaSelecionados(diasUnicos)
-        // Pega horários únicos do semanal
         const horariosUnicos = [...new Set(hs.map(h => h.horario.slice(0, 5)))]
         setHorariosSemanal(horariosUnicos.length > 0 ? horariosUnicos : [''])
-        setDiasMesSelecionados([])
-        setHorariosMensal([''])
+        setDiasMesSelecionados([]); setHorariosMensal([''])
       } else if (med.frequencia_tipo === 'mensal') {
-        setHorarios([''])
-        setDiasSemanaSelecionados([])
-        setHorariosSemanal([''])
+        setHorarios([]); setDiasSemanaSelecionados([]); setHorariosSemanal([''])
         const diasUnicos = [...new Set(hs.map(h => h.dia_mes).filter(d => d !== null) as number[])]
         setDiasMesSelecionados(diasUnicos)
         const horariosUnicos = [...new Set(hs.map(h => h.horario.slice(0, 5)))]
         setHorariosMensal(horariosUnicos.length > 0 ? horariosUnicos : [''])
       } else {
-        setHorarios([''])
-        setDiasSemanaSelecionados([])
-        setHorariosSemanal([''])
-        setDiasMesSelecionados([])
-        setHorariosMensal([''])
+        setHorarios(['']); setDiasSemanaSelecionados([]); setHorariosSemanal([''])
+        setDiasMesSelecionados([]); setHorariosMensal([''])
       }
     } else {
       resetForm()
     }
-
     setModalVisivel(true)
     Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 }).start()
   }
@@ -403,93 +368,80 @@ export default function Medicamentos() {
     Animated.timing(slideAnim, { toValue: height, duration: 280, useNativeDriver: true }).start(() => setModalVisivel(false))
   }
 
-  // ── Toggles dia semana / dia mês ──────────────────────────────────────────
 
   function toggleDiaSemana(dia: number) {
-    setDiasSemanaSelecionados(prev =>
-      prev.includes(dia) ? prev.filter(d => d !== dia) : [...prev, dia]
-    )
+    setDiasSemanaSelecionados(prev => prev.includes(dia) ? prev.filter(d => d !== dia) : [...prev, dia])
   }
-
   function toggleDiaMes(dia: number) {
-    setDiasMesSelecionados(prev =>
-      prev.includes(dia) ? prev.filter(d => d !== dia) : [...prev, dia]
-    )
+    setDiasMesSelecionados(prev => prev.includes(dia) ? prev.filter(d => d !== dia) : [...prev, dia])
   }
 
-  // ── Horários diários ──────────────────────────────────────────────────────
+
   function adicionarHorario() { setHorarios(prev => [...prev, '']) }
-  function removerHorario(index: number) { setHorarios(prev => prev.filter((_, i) => i !== index)) }
-  function atualizarHorario(index: number, valor: string) {
-    setHorarios(prev => prev.map((h, i) => i === index ? mascaraHorario(valor) : h))
+  function removerHorario(i: number) { setHorarios(prev => prev.filter((_, idx) => idx !== i)) }
+  function atualizarHorario(i: number, v: string) {
+    setHorarios(prev => prev.map((h, idx) => idx === i ? mascaraHorario(v) : h))
   }
-
-  // ── Horários semanal ──────────────────────────────────────────────────────
   function adicionarHorarioSemanal() { setHorariosSemanal(prev => [...prev, '']) }
-  function removerHorarioSemanal(index: number) { setHorariosSemanal(prev => prev.filter((_, i) => i !== index)) }
-  function atualizarHorarioSemanal(index: number, valor: string) {
-    setHorariosSemanal(prev => prev.map((h, i) => i === index ? mascaraHorario(valor) : h))
+  function removerHorarioSemanal(i: number) { setHorariosSemanal(prev => prev.filter((_, idx) => idx !== i)) }
+  function atualizarHorarioSemanal(i: number, v: string) {
+    setHorariosSemanal(prev => prev.map((h, idx) => idx === i ? mascaraHorario(v) : h))
   }
-
-  // ── Horários mensal ───────────────────────────────────────────────────────
   function adicionarHorarioMensal() { setHorariosMensal(prev => [...prev, '']) }
-  function removerHorarioMensal(index: number) { setHorariosMensal(prev => prev.filter((_, i) => i !== index)) }
-  function atualizarHorarioMensal(index: number, valor: string) {
-    setHorariosMensal(prev => prev.map((h, i) => i === index ? mascaraHorario(valor) : h))
+  function removerHorarioMensal(i: number) { setHorariosMensal(prev => prev.filter((_, idx) => idx !== i)) }
+  function atualizarHorarioMensal(i: number, v: string) {
+    setHorariosMensal(prev => prev.map((h, idx) => idx === i ? mascaraHorario(v) : h))
   }
 
-  // ── Validação ─────────────────────────────────────────────────────────────
+
+  function handleStatusChange(v: Medicamento['status']) {
+    if (v === 'pausado') {
+      setModalPausar(true)
+      setStatus(v)
+    } else if (v === 'encerrado') {
+      setStatus(v)
+      setDataRetorno('')
+    } else {
+      setStatus(v)
+      setMotivoEncerramento('')
+      setDataRetorno('')
+    }
+  }
+
 
   function validar(): boolean {
-    const novosErros: Record<string, boolean> = {}
-
-    if (!nome.trim()) novosErros.nome = true
-    if (!dosagem.trim()) novosErros.dosagem = true
-    if (!quantidadePorDose.trim()) novosErros.quantidadePorDose = true
-    if (!dataInicio || dataInicio.length < 10) novosErros.dataInicio = true
-
-    if (dataInicio.length === 10 && dataEhPassada(dataInicio)) {
-      novosErros.dataInicioPassada = true
-    }
-
-    if (frequenciaTipo === 'personalizado' && !intervaloHoras) {
-      novosErros.intervaloHoras = true
-    }
-
+    const e: Record<string, boolean> = {}
+    if (!nome.trim()) e.nome = true
+    if (!dosagem.trim()) e.dosagem = true
+    if (!quantidadePorDose.trim()) e.quantidadePorDose = true
+    if (!dataInicio || dataInicio.length < 10) e.dataInicio = true
+    if (dataInicio.length === 10 && dataEhPassada(dataInicio)) e.dataInicioPassada = true
+    if (frequenciaTipo === 'personalizado' && !intervaloHoras) e.intervaloHoras = true
+    if (status === 'pausado' && (!dataRetorno || dataRetorno.length < 10)) e.dataRetorno = true
     if (frequenciaTipo === 'semanal') {
-      if (diasSemanaSelecionados.length === 0) novosErros.diasSemana = true
-      const horariosValidos = horariosSemanal.filter(h => h.length === 5)
-      if (horariosValidos.length === 0) novosErros.horarioSemanal = true
+      if (diasSemanaSelecionados.length === 0) e.diasSemana = true
+      if (horariosSemanal.filter(h => h.length === 5).length === 0) e.horarioSemanal = true
     }
-
     if (frequenciaTipo === 'mensal') {
-      if (diasMesSelecionados.length === 0) novosErros.diasMes = true
-      const horariosValidos = horariosMensal.filter(h => h.length === 5)
-      if (horariosValidos.length === 0) novosErros.horarioMensal = true
+      if (diasMesSelecionados.length === 0) e.diasMes = true
+      if (horariosMensal.filter(h => h.length === 5).length === 0) e.horarioMensal = true
     }
-
     if (frequenciaTipo === 'diario') {
-      const validos = horarios.filter(h => h.length === 5)
-      if (validos.length === 0) novosErros.horarioDiario = true
+      if (horarios.filter(h => h.length === 5).length === 0) e.horarioDiario = true
     }
-
-    setErros(novosErros)
-
-    if (Object.keys(novosErros).length > 0) {
-      Alert.alert('Campos obrigatórios', 'Preencha todos os campos destacados antes de continuar.')
+    setErros(e)
+    if (Object.keys(e).length > 0) {
+      setModalAlerta({ visivel: true, titulo: 'Campos obrigatórios', mensagem: 'Preencha todos os campos destacados antes de continuar.' })
       return false
     }
     return true
   }
 
-  // ── Salvar ────────────────────────────────────────────────────────────────
 
   async function salvar() {
     if (!validar()) return
-    if (!usuarioId) { Alert.alert('Erro', 'Usuário não autenticado.'); router.replace('/auth'); return }
-
+    if (!usuarioId) { setModalAlerta({ visivel: true, titulo: 'Erro', mensagem: 'Usuário não autenticado.' }); router.replace('/auth'); return }
     setCarregando(true)
-
     try {
       const payload = {
         usuario_id: usuarioId,
@@ -499,13 +451,14 @@ export default function Medicamentos() {
         intervalo_horas: intervaloHoras ? parseInt(intervaloHoras) : null,
         data_inicio: converterData(dataInicio),
         data_termino: dataTermino && dataTermino.length === 10 ? converterData(dataTermino) : null,
+        data_retorno: status === 'pausado' && dataRetorno.length === 10 ? converterData(dataRetorno) : null,
         quantidade_por_dose: quantidadePorDose.trim(),
         observacoes: observacoes.trim() || null,
         status,
+        motivo_encerramento: status === 'encerrado' ? (motivoEncerramento.trim() || null) : null,
       }
 
       let medicamentoId: number
-
       if (editando) {
         const { error } = await supabase.from('medicamentos').update(payload).eq('id', editando.id)
         if (error) throw error
@@ -518,42 +471,19 @@ export default function Medicamentos() {
         medicamentoId = data.id
       }
 
-      // Monta registros de horário conforme o tipo
       let horariosParaSalvar: { medicamento_id: number; horario: string; dia_semana: number | null; dia_mes: number | null }[] = []
-
       if (frequenciaTipo === 'diario') {
-        const validos = horarios.filter(h => h.length === 5)
-        horariosParaSalvar = validos.map(h => ({
-          medicamento_id: medicamentoId,
-          horario: h,
-          dia_semana: null,
-          dia_mes: null,
-        }))
+        horariosParaSalvar = horarios.filter(h => h.length === 5).map(h => ({ medicamento_id: medicamentoId, horario: h, dia_semana: null, dia_mes: null }))
       } else if (frequenciaTipo === 'semanal') {
-        // Cada combinação dia × horário
         const horariosValidos = horariosSemanal.filter(h => h.length === 5)
-        for (const dia of diasSemanaSelecionados) {
-          for (const hor of horariosValidos) {
-            horariosParaSalvar.push({
-              medicamento_id: medicamentoId,
-              horario: hor,
-              dia_semana: dia,
-              dia_mes: null,
-            })
-          }
-        }
+        for (const dia of diasSemanaSelecionados)
+          for (const hor of horariosValidos)
+            horariosParaSalvar.push({ medicamento_id: medicamentoId, horario: hor, dia_semana: dia, dia_mes: null })
       } else if (frequenciaTipo === 'mensal') {
         const horariosValidos = horariosMensal.filter(h => h.length === 5)
-        for (const dia of diasMesSelecionados) {
-          for (const hor of horariosValidos) {
-            horariosParaSalvar.push({
-              medicamento_id: medicamentoId,
-              horario: hor,
-              dia_semana: null,
-              dia_mes: dia,
-            })
-          }
-        }
+        for (const dia of diasMesSelecionados)
+          for (const hor of horariosValidos)
+            horariosParaSalvar.push({ medicamento_id: medicamentoId, horario: hor, dia_semana: null, dia_mes: dia })
       }
 
       if (horariosParaSalvar.length > 0) {
@@ -563,52 +493,42 @@ export default function Medicamentos() {
 
       fecharModal()
       await buscar()
-
+      setModalSucesso({
+        visivel: true,
+        titulo: editando ? 'Medicamento atualizado!' : 'Medicamento cadastrado!',
+        mensagem: editando ? `${nome.trim()} foi atualizado com sucesso.` : `${nome.trim()} foi adicionado à sua lista.`,
+      })
     } catch (err: any) {
       console.error('Erro ao salvar:', err.message)
-      Alert.alert('Erro ao salvar', err.message ?? 'Tente novamente.')
+      setModalAlerta({ visivel: true, titulo: 'Erro ao salvar', mensagem: err.message ?? 'Tente novamente.' })
     } finally {
       setCarregando(false)
     }
   }
 
-  // ── Excluir ───────────────────────────────────────────────────────────────
 
   function confirmarExcluir(id: number) { setExcluirId(id); setModalExcluir(true) }
-
   async function excluir() {
     if (!excluirId) return
     const { error } = await supabase.from('medicamentos').delete().eq('id', excluirId)
-    if (error) { Alert.alert('Erro ao excluir', error.message); return }
-    setModalExcluir(false)
-    setExcluirId(null)
+    if (error) { setModalAlerta({ visivel: true, titulo: 'Erro ao excluir', mensagem: error.message }); return }
+    setModalExcluir(false); setExcluirId(null)
     await buscar()
   }
 
-  // ── Render horários diários ───────────────────────────────────────────────
-
   function renderHorariosDiarios() {
     return (
-      <>
-        <GrupoHorarios
-          label="HORÁRIOS DO DIA"
-          descricao="Informe os horários em que o medicamento deve ser tomado. Você pode adicionar quantos horários precisar."
-          horarios={horarios}
-          onAdicionar={adicionarHorario}
-          onRemover={removerHorario}
-          onAtualizar={atualizarHorario}
-        />
-        {erros.horarioDiario && (
-          <View style={styles.erroRow}>
-            <Feather name="alert-circle" size={13} color="#dc2626" />
-            <Text style={styles.erroTexto}>Informe pelo menos um horário</Text>
-          </View>
-        )}
-      </>
+      <GrupoHorarios
+        label="HORÁRIOS DO DIA"
+        descricao="Informe os horários em que o medicamento deve ser tomado."
+        horarios={horarios}
+        onAdicionar={adicionarHorario}
+        onRemover={removerHorario}
+        onAtualizar={(i, v) => { atualizarHorario(i, v); setErros(p => ({ ...p, horarioDiario: false })) }}
+        erro={erros.horarioDiario}
+      />
     )
   }
-
-  // ── Render semanal ────────────────────────────────────────────────────────
 
   function renderSemanal() {
     return (
@@ -616,16 +536,8 @@ export default function Medicamentos() {
         <Text style={styles.campoLabel}>DIAS DA SEMANA</Text>
         <View style={styles.avisoBox}>
           <Feather name="info" size={14} color="#6B49AD" />
-          <Text style={styles.avisoTexto}>Selecione os dias em que o medicamento será tomado e os horários correspondentes.</Text>
+          <Text style={styles.avisoTexto}>Selecione os dias em que o medicamento será tomado.</Text>
         </View>
-
-        {erros.diasSemana && (
-          <View style={[styles.erroRow, { marginBottom: 10 }]}>
-            <Feather name="alert-circle" size={13} color="#dc2626" />
-            <Text style={styles.erroTexto}>Selecione pelo menos um dia</Text>
-          </View>
-        )}
-
         <View style={styles.diasRow}>
           {DIAS_SEMANA.map(({ label, valor }) => {
             const ativo = diasSemanaSelecionados.includes(valor)
@@ -633,38 +545,32 @@ export default function Medicamentos() {
               <TouchableOpacity
                 key={valor}
                 style={[styles.diaPilula, ativo && styles.diaPilulaAtiva, erros.diasSemana && !ativo && styles.diaPilulaErro]}
-                onPress={() => {
-                  toggleDiaSemana(valor)
-                  if (erros.diasSemana) setErros(prev => ({ ...prev, diasSemana: false }))
-                }}
+                onPress={() => { toggleDiaSemana(valor); setErros(p => ({ ...p, diasSemana: false })) }}
               >
                 <Text style={[styles.diaTexto, ativo && styles.diaTextoAtivo]}>{label}</Text>
               </TouchableOpacity>
             )
           })}
         </View>
-
-        <View style={{ height: 16 }} />
-
+        {erros.diasSemana && (
+          <View style={[styles.erroRow, { marginTop: 8 }]}>
+            <Feather name="alert-circle" size={13} color="#dc2626" />
+            <Text style={styles.erroTexto}>Selecione pelo menos um dia</Text>
+          </View>
+        )}
+        <View style={{ height: 20 }} />
         <GrupoHorarios
           label="HORÁRIOS"
-          descricao="Esses horários valerão para todos os dias selecionados acima."
+          descricao="Esses horários valerão para todos os dias selecionados."
           horarios={horariosSemanal}
           onAdicionar={adicionarHorarioSemanal}
           onRemover={removerHorarioSemanal}
-          onAtualizar={atualizarHorarioSemanal}
+          onAtualizar={(i, v) => { atualizarHorarioSemanal(i, v); setErros(p => ({ ...p, horarioSemanal: false })) }}
+          erro={erros.horarioSemanal}
         />
-        {erros.horarioSemanal && (
-          <View style={styles.erroRow}>
-            <Feather name="alert-circle" size={13} color="#dc2626" />
-            <Text style={styles.erroTexto}>Informe pelo menos um horário</Text>
-          </View>
-        )}
       </View>
     )
   }
-
-  // ── Render mensal ─────────────────────────────────────────────────────────
 
   function renderMensal() {
     const diasDoMes = Array.from({ length: 31 }, (_, i) => i + 1)
@@ -675,14 +581,6 @@ export default function Medicamentos() {
           <Feather name="info" size={14} color="#6B49AD" />
           <Text style={styles.avisoTexto}>Toque nos dias do mês em que o medicamento deve ser tomado.</Text>
         </View>
-
-        {erros.diasMes && (
-          <View style={[styles.erroRow, { marginBottom: 10 }]}>
-            <Feather name="alert-circle" size={13} color="#dc2626" />
-            <Text style={styles.erroTexto}>Selecione pelo menos um dia</Text>
-          </View>
-        )}
-
         <View style={styles.diasMesGrid}>
           {diasDoMes.map(dia => {
             const ativo = diasMesSelecionados.includes(dia)
@@ -690,48 +588,46 @@ export default function Medicamentos() {
               <TouchableOpacity
                 key={dia}
                 style={[styles.diaMesItem, ativo && styles.diaMesItemAtivo, erros.diasMes && !ativo && styles.diaMesItemErro]}
-                onPress={() => {
-                  toggleDiaMes(dia)
-                  if (erros.diasMes) setErros(prev => ({ ...prev, diasMes: false }))
-                }}
+                onPress={() => { toggleDiaMes(dia); setErros(p => ({ ...p, diasMes: false })) }}
               >
                 <Text style={[styles.diaMesTexto, ativo && styles.diaMesTextoAtivo]}>{dia}</Text>
               </TouchableOpacity>
             )
           })}
         </View>
-
-        <View style={{ height: 16 }} />
-
+        {erros.diasMes && (
+          <View style={[styles.erroRow, { marginTop: 8 }]}>
+            <Feather name="alert-circle" size={13} color="#dc2626" />
+            <Text style={styles.erroTexto}>Selecione pelo menos um dia</Text>
+          </View>
+        )}
+        <View style={{ height: 20 }} />
         <GrupoHorarios
           label="HORÁRIOS"
-          descricao="Esses horários valerão para todos os dias selecionados acima."
+          descricao="Esses horários valerão para todos os dias selecionados."
           horarios={horariosMensal}
           onAdicionar={adicionarHorarioMensal}
           onRemover={removerHorarioMensal}
-          onAtualizar={atualizarHorarioMensal}
+          onAtualizar={(i, v) => { atualizarHorarioMensal(i, v); setErros(p => ({ ...p, horarioMensal: false })) }}
+          erro={erros.horarioMensal}
         />
-        {erros.horarioMensal && (
-          <View style={styles.erroRow}>
-            <Feather name="alert-circle" size={13} color="#dc2626" />
-            <Text style={styles.erroTexto}>Informe pelo menos um horário</Text>
-          </View>
-        )}
       </View>
     )
   }
 
-  // ── Render resumo horários no card ────────────────────────────────────────
 
   function renderInfoHorarios(med: Medicamento) {
     const hs = med.medicamento_horarios ?? []
     if (med.frequencia_tipo === 'diario') {
-      return hs.map(h => (
-        <View key={h.id} style={styles.infoItem}>
-          <Feather name="clock" size={14} color="#6B49AD" />
-          <Text style={styles.infoTexto}>{h.horario.slice(0, 5)}</Text>
+      const horariosStr = hs.map(h => h.horario.slice(0, 5)).join(' · ')
+      if (!horariosStr) return null
+      return (
+        <View style={styles.infoLinha}>
+          <Feather name="clock" size={15} color="#6B49AD" />
+          <Text style={styles.infoLinhaLabel}>Horários</Text>
+          <Text style={styles.infoLinhaTexto}>{horariosStr}</Text>
         </View>
-      ))
+      )
     }
     if (med.frequencia_tipo === 'semanal') {
       const dias = [...new Set(hs.map(h => DIAS_SEMANA.find(d => d.valor === h.dia_semana)?.label ?? ''))].filter(Boolean)
@@ -739,17 +635,19 @@ export default function Medicamentos() {
       return (
         <>
           {dias.length > 0 && (
-            <View style={styles.infoItem}>
-              <Feather name="calendar" size={14} color="#6B49AD" />
-              <Text style={styles.infoTexto}>{dias.join(', ')}</Text>
+            <View style={styles.infoLinha}>
+              <Feather name="calendar" size={15} color="#6B49AD" />
+              <Text style={styles.infoLinhaLabel}>Dias</Text>
+              <Text style={styles.infoLinhaTexto}>{dias.join(', ')}</Text>
             </View>
           )}
-          {horariosUnicos.map((hor, i) => (
-            <View key={i} style={styles.infoItem}>
-              <Feather name="clock" size={14} color="#6B49AD" />
-              <Text style={styles.infoTexto}>{hor}</Text>
+          {horariosUnicos.length > 0 && (
+            <View style={styles.infoLinha}>
+              <Feather name="clock" size={15} color="#6B49AD" />
+              <Text style={styles.infoLinhaLabel}>Horários</Text>
+              <Text style={styles.infoLinhaTexto}>{horariosUnicos.join(' · ')}</Text>
             </View>
-          ))}
+          )}
         </>
       )
     }
@@ -759,82 +657,85 @@ export default function Medicamentos() {
       return (
         <>
           {dias.length > 0 && (
-            <View style={styles.infoItem}>
-              <Feather name="calendar" size={14} color="#6B49AD" />
-              <Text style={styles.infoTexto}>Dias: {dias.join(', ')}</Text>
+            <View style={styles.infoLinha}>
+              <Feather name="calendar" size={15} color="#6B49AD" />
+              <Text style={styles.infoLinhaLabel}>Dias</Text>
+              <Text style={styles.infoLinhaTexto}>{dias.join(', ')}</Text>
             </View>
           )}
-          {horariosUnicos.map((hor, i) => (
-            <View key={i} style={styles.infoItem}>
-              <Feather name="clock" size={14} color="#6B49AD" />
-              <Text style={styles.infoTexto}>{hor}</Text>
+          {horariosUnicos.length > 0 && (
+            <View style={styles.infoLinha}>
+              <Feather name="clock" size={15} color="#6B49AD" />
+              <Text style={styles.infoLinhaLabel}>Horários</Text>
+              <Text style={styles.infoLinhaTexto}>{horariosUnicos.join(' · ')}</Text>
             </View>
-          ))}
+          )}
         </>
       )
     }
     if (med.frequencia_tipo === 'personalizado' && med.intervalo_horas) {
       return (
-        <View style={styles.infoItem}>
-          <Feather name="clock" size={14} color="#6B49AD" />
-          <Text style={styles.infoTexto}>A cada {med.intervalo_horas}h</Text>
+        <View style={styles.infoLinha}>
+          <Feather name="clock" size={15} color="#6B49AD" />
+          <Text style={styles.infoLinhaLabel}>Intervalo</Text>
+          <Text style={styles.infoLinhaTexto}>A cada {med.intervalo_horas}h</Text>
         </View>
       )
     }
     return null
   }
 
-  // ── Render principal ──────────────────────────────────────────────────────
-
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Card 1 — Perfil + Logo */}
+        {/* Card 1 — Perfil + Logo (menor) */}
         <View style={styles.cardPerfil}>
-          <View style={styles.cardPerfilConteudo}>
-            <TouchableOpacity
-              onPress={() => router.push('/modulos/perfil' as any)}
-              activeOpacity={0.85}
-            >
-              {perfilFoto ? (
-                <Image source={{ uri: perfilFoto }} style={styles.fotoPerfil} onError={(e) => { console.log('ERRO ao carregar foto perfil:', e.nativeEvent.error, perfilFoto); setPerfilFoto(null) }} />
-              ) : (
-                <View style={styles.fotoPerfilPlaceholder}>
-                  <Feather name="user" size={28} color="#9163CB" />
-                </View>
-              )}
-            </TouchableOpacity>
-            <View style={styles.logoArea}>
-              <Image
-                source={require('../../assets/images/logo.png')}
-                style={styles.logo}
-                resizeMode="contain"
-              />
-              {perfilNome ? (
-                <Text style={styles.perfilBoasVindas}>Olá, {perfilNome.split(' ')[0]} 👋</Text>
-              ) : null}
-            </View>
-            <TouchableOpacity onPress={() => router.back()} style={styles.voltarBtn}>
-              <Feather name="arrow-left" size={20} color="#6B49AD" />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity onPress={() => router.push('/modulos/perfil' as any)} activeOpacity={0.85}>
+            {perfilFoto ? (
+              <Image source={{ uri: perfilFoto }} style={styles.fotoPerfil} onError={() => setPerfilFoto(null)} />
+            ) : (
+              <View style={styles.fotoPerfilPlaceholder}>
+                <Feather name="user" size={24} color="#9163CB" />
+              </View>
+            )}
+          </TouchableOpacity>
+          <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
+          <TouchableOpacity onPress={() => router.back()} style={styles.voltarBtn}>
+            <Feather name="arrow-left" size={18} color="#6B49AD" />
+          </TouchableOpacity>
         </View>
 
-        {/* Card 2 — Título da listagem */}
-        <View style={styles.cardTituloLista}>
-          <LinearGradient
-            colors={['#6B49AD', '#481D94']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={styles.cardTituloGradient}
+        {/* Card 2 — REMÉDIOS (fino, centralizado, menor) */}
+        <LinearGradient
+          colors={['#6B49AD', '#6843B1', '#481D94']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          style={styles.cardTituloLista}
+        >
+          <Text style={styles.cardTituloTexto}>REMÉDIOS</Text>
+        </LinearGradient>
+
+        {/* Botões abaixo do card REMÉDIOS — canto direito */}
+        <View style={styles.botoesAcao}>
+          <TouchableOpacity
+            onPress={() => router.push('/modulos/historico' as any)}
+            activeOpacity={0.85}
+            style={styles.btnAcaoSecundario}
           >
-            <Feather name="activity" size={22} color="#fff" />
-            <Text style={styles.cardTituloTexto}>MEDICAMENTOS</Text>
-            <TouchableOpacity onPress={() => abrirModal()} activeOpacity={0.8} style={styles.btnNovoHeader}>
-              <Feather name="plus" size={20} color="#fff" />
-              <Text style={styles.btnNovoHeaderTexto}>Cadastrar</Text>
-            </TouchableOpacity>
-          </LinearGradient>
+            <Feather name="clock" size={16} color="#6B49AD" />
+            <Text style={styles.btnAcaoSecundarioTexto}>Histórico</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => abrirModal()} activeOpacity={0.85} style={styles.btnAcaoPrimario}>
+            <LinearGradient
+              colors={['#6B49AD', '#481D94']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={styles.btnAcaoPrimarioGradient}
+            >
+              <Feather name="plus" size={16} color="#fff" />
+              <Text style={styles.btnAcaoPrimarioTexto}>Cadastrar</Text>
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
 
         {/* Card 3 — Lista */}
@@ -854,7 +755,7 @@ export default function Medicamentos() {
                 <View key={med.id} style={styles.card}>
                   <View style={styles.cardTopo}>
                     <LinearGradient
-                      colors={['#6B49AD', '#481D94']}
+                      colors={['#6B49AD', '#6843B1', '#481D94']}
                       start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                       style={styles.cardIconeBox}
                     >
@@ -878,167 +779,192 @@ export default function Medicamentos() {
                     </View>
                   </View>
 
-                  <View style={styles.cardInfoRow}>
+                  <View style={styles.cardDivisor} />
+
+                  <View style={styles.cardInfos}>
                     {med.dosagem ? (
-                      <View style={styles.infoItem}>
-                        <Feather name="droplet" size={13} color="#6B49AD" />
-                        <Text style={styles.infoTexto}>{med.dosagem}</Text>
+                      <View style={styles.infoLinha}>
+                        <Feather name="droplet" size={15} color="#6B49AD" />
+                        <Text style={styles.infoLinhaLabel}>Dosagem</Text>
+                        <Text style={styles.infoLinhaTexto}>{med.dosagem}</Text>
                       </View>
                     ) : null}
-                    <View style={styles.infoItem}>
-                      <Feather name="refresh-cw" size={13} color="#6B49AD" />
-                      <Text style={styles.infoTexto}>{labelFrequencia(med)}</Text>
+                    {med.quantidade_por_dose ? (
+                      <View style={styles.infoLinha}>
+                        <Feather name="package" size={15} color="#6B49AD" />
+                        <Text style={styles.infoLinhaLabel}>Por dose</Text>
+                        <Text style={styles.infoLinhaTexto}>{med.quantidade_por_dose}</Text>
+                      </View>
+                    ) : null}
+                    <View style={styles.infoLinha}>
+                      <Feather name="refresh-cw" size={15} color="#6B49AD" />
+                      <Text style={styles.infoLinhaLabel}>Frequência</Text>
+                      <Text style={styles.infoLinhaTexto}>{labelFrequencia(med)}</Text>
                     </View>
                     {renderInfoHorarios(med)}
+                    {med.data_inicio ? (
+                      <View style={styles.infoLinha}>
+                        <Feather name="calendar" size={15} color="#6B49AD" />
+                        <Text style={styles.infoLinhaLabel}>Início</Text>
+                        <Text style={styles.infoLinhaTexto}>{formatarDataParaTela(med.data_inicio)}</Text>
+                      </View>
+                    ) : null}
+                    {med.data_termino ? (
+                      <View style={styles.infoLinha}>
+                        <Feather name="calendar" size={15} color="#6B49AD" />
+                        <Text style={styles.infoLinhaLabel}>Término</Text>
+                        <Text style={styles.infoLinhaTexto}>{formatarDataParaTela(med.data_termino)}</Text>
+                      </View>
+                    ) : null}
+                    {med.status === 'pausado' && med.data_retorno ? (
+                      <View style={[styles.infoLinha, styles.infoLinhaDestaque]}>
+                        <Feather name="clock" size={15} color="#481D94" />
+                        <Text style={[styles.infoLinhaLabel, { color: '#481D94' }]}>Retorno</Text>
+                        <Text style={[styles.infoLinhaTexto, { color: '#481D94' }]}>{formatarDataParaTela(med.data_retorno)}</Text>
+                      </View>
+                    ) : null}
+                    {med.status === 'encerrado' && med.motivo_encerramento ? (
+                      <View style={[styles.infoLinha, styles.infoLinhaDestaque, { alignItems: 'flex-start' }]}>
+                        <Feather name="x-circle" size={15} color="#481D94" style={{ marginTop: 2 }} />
+                        <Text style={[styles.infoLinhaLabel, { color: '#481D94' }]}>Motivo</Text>
+                        <Text style={[styles.infoLinhaTexto, { color: '#481D94', flex: 1 }]}>{med.motivo_encerramento}</Text>
+                      </View>
+                    ) : null}
+                    {med.observacoes ? (
+                      <View style={[styles.infoLinha, { alignItems: 'flex-start' }]}>
+                        <Feather name="file-text" size={15} color="#6B49AD" style={{ marginTop: 2 }} />
+                        <Text style={styles.infoLinhaLabel}>Obs.</Text>
+                        <Text style={[styles.infoLinhaTexto, { flex: 1 }]}>{med.observacoes}</Text>
+                      </View>
+                    ) : null}
                   </View>
                 </View>
               )
             })
           )}
-          <View style={{ height: 32 }} />
         </View>
       </ScrollView>
 
       {/* Modal cadastro/edição */}
       <Modal visible={modalVisivel} transparent animationType="none">
-        <KeyboardAvoidingView
-          style={styles.modalFundo}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
+        <KeyboardAvoidingView style={styles.modalFundo} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <TouchableOpacity style={styles.modalOverlay} onPress={fecharModal} activeOpacity={1} />
           <Animated.View style={[styles.modalCard, { transform: [{ translateY: slideAnim }] }]}>
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <View style={styles.modalHandle} />
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitulo}>
-                  {editando ? 'Editar medicamento' : 'Novo medicamento'}
-                </Text>
+                <Text style={styles.modalTitulo}>{editando ? 'Editar medicamento' : 'Novo medicamento'}</Text>
                 <TouchableOpacity onPress={fecharModal} style={styles.modalFechar}>
                   <Feather name="x" size={22} color="#9163CB" />
                 </TouchableOpacity>
               </View>
 
-              {/* Nome */}
-              <Campo
-                label="NOME DO MEDICAMENTO"
-                value={nome}
+              <Campo label="NOME DO MEDICAMENTO" value={nome}
                 onChangeText={(v) => { setNome(v); setErros(p => ({ ...p, nome: false })) }}
-                placeholder="Ex: Paracetamol"
-                obrigatorio
-                erro={erros.nome}
-              />
+                placeholder="Ex: Paracetamol" erro={erros.nome} obrigatorio />
 
-              {/* Dosagem e Qtde por dose */}
               <View style={styles.duasColunas}>
                 <View style={styles.coluna}>
-                  <Campo
-                    label="DOSAGEM"
-                    value={dosagem}
+                  <Campo label="DOSAGEM" value={dosagem}
                     onChangeText={(v) => { setDosagem(v); setErros(p => ({ ...p, dosagem: false })) }}
-                    placeholder="Ex: 500mg"
-                    obrigatorio
-                    erro={erros.dosagem}
-                  />
+                    placeholder="Ex: 500mg" erro={erros.dosagem} obrigatorio />
                 </View>
                 <View style={styles.coluna}>
-                  <Campo
-                    label="QTDE POR DOSE"
-                    value={quantidadePorDose}
+                  <Campo label="QTDE POR DOSE" value={quantidadePorDose}
                     onChangeText={(v) => { setQuantidadePorDose(v); setErros(p => ({ ...p, quantidadePorDose: false })) }}
-                    placeholder="Ex: 1 comprimido"
-                    obrigatorio
-                    erro={erros.quantidadePorDose}
-                  />
+                    placeholder="Ex: 1 comp." erro={erros.quantidadePorDose} obrigatorio />
                 </View>
               </View>
 
-              {/* Frequência */}
-              <SeletorOpcoes
-                label="FREQUÊNCIA"
-                value={frequenciaTipo}
-                onChange={setFrequenciaTipo}
+              <SeletorOpcoes label="FREQUÊNCIA" value={frequenciaTipo} onChange={setFrequenciaTipo}
                 opcoes={[
                   { label: 'Diário', valor: 'diario' },
                   { label: 'Semanal', valor: 'semanal' },
                   { label: 'Mensal', valor: 'mensal' },
                   { label: 'Custom', valor: 'personalizado' },
-                ]}
-              />
+                ]} />
 
-              {/* Campos dinâmicos */}
               {frequenciaTipo === 'diario' && renderHorariosDiarios()}
               {frequenciaTipo === 'semanal' && renderSemanal()}
               {frequenciaTipo === 'mensal' && renderMensal()}
               {frequenciaTipo === 'personalizado' && (
-                <Campo
-                  label="INTERVALO EM HORAS"
-                  value={intervaloHoras}
+                <Campo label="INTERVALO EM HORAS" value={intervaloHoras}
                   onChangeText={(v) => { setIntervaloHoras(v); setErros(p => ({ ...p, intervaloHoras: false })) }}
-                  placeholder="Ex: 8"
-                  keyboardType="numeric"
-                  obrigatorio
-                  erro={erros.intervaloHoras}
-                  dica="O medicamento será lembrado a cada X horas a partir do início."
-                />
+                  placeholder="Ex: 8" keyboardType="numeric" erro={erros.intervaloHoras} obrigatorio
+                  dica="O medicamento será lembrado a cada X horas a partir do início." />
               )}
 
-              {/* Data início */}
-              <Campo
-                label="DATA INÍCIO"
-                value={dataInicio}
+              <Campo label="DATA INÍCIO" value={dataInicio}
                 onChangeText={(t) => { setDataInicio(mascaraData(t)); setErros(p => ({ ...p, dataInicio: false, dataInicioPassada: false })) }}
-                placeholder="DD/MM/AAAA"
-                keyboardType="numeric"
-                obrigatorio
+                placeholder="DD/MM/AAAA" keyboardType="numeric" obrigatorio
                 erro={erros.dataInicio || erros.dataInicioPassada}
-              />
-              {erros.dataInicioPassada && (
-                <View style={[styles.erroRow, { marginTop: -10, marginBottom: 12 }]}>
-                  <Feather name="alert-circle" size={13} color="#dc2626" />
-                  <Text style={styles.erroTexto}>A data de início não pode ser uma data passada</Text>
+                erroTexto={erros.dataInicioPassada ? 'A data de início não pode ser uma data passada' : 'Este campo é obrigatório'} />
+
+              <Campo label="DATA TÉRMINO" value={dataTermino}
+                onChangeText={(t) => setDataTermino(mascaraData(t))}
+                placeholder="DD/MM/AAAA" keyboardType="numeric" opcional
+                dica="Deixe em branco se o uso for contínuo." />
+
+              <Campo label="OBSERVAÇÕES" value={observacoes} onChangeText={setObservacoes}
+                placeholder="Ex: Tomar com água" opcional />
+
+              {/* Status */}
+              <View style={styles.campoWrapper}>
+                <Text style={styles.campoLabel}>STATUS</Text>
+                <View style={styles.seletorRow}>
+                  {(['ativo', 'pausado', 'encerrado'] as Medicamento['status'][]).map((s) => (
+                    <TouchableOpacity
+                      key={s}
+                      style={[styles.seletorOpcao, status === s && styles.seletorOpcaoAtiva]}
+                      onPress={() => handleStatusChange(s)}
+                    >
+                      <Text style={[styles.seletorTexto, status === s && styles.seletorTextoAtivo]}>
+                        {s.charAt(0).toUpperCase() + s.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Box pausado */}
+              {status === 'pausado' && (
+                <View style={styles.statusBox}>
+                  <View style={styles.statusBoxHeader}>
+                    <Feather name="pause-circle" size={16} color="#481D94" />
+                    <Text style={styles.statusBoxTitulo}>Quando deseja retomar?</Text>
+                  </View>
+                  <Text style={styles.statusBoxSub}>Esta data será usada para lembrar você de retomar o medicamento.</Text>
+                  <Campo label="DATA DE RETORNO" value={dataRetorno}
+                    onChangeText={(t) => { setDataRetorno(mascaraData(t)); setErros(p => ({ ...p, dataRetorno: false })) }}
+                    placeholder="DD/MM/AAAA" keyboardType="numeric" obrigatorio
+                    erro={erros.dataRetorno} erroTexto="Informe a data de retorno" />
                 </View>
               )}
 
-              {/* Data término */}
-              <Campo
-                label="DATA TÉRMINO"
-                value={dataTermino}
-                onChangeText={(t) => setDataTermino(mascaraData(t))}
-                placeholder="DD/MM/AAAA"
-                keyboardType="numeric"
-                opcional
-                dica="Deixe em branco se o uso for contínuo."
-              />
+              {/* Box encerrado */}
+              {status === 'encerrado' && (
+                <View style={styles.statusBox}>
+                  <View style={styles.statusBoxHeader}>
+                    <Feather name="x-circle" size={16} color="#481D94" />
+                    <Text style={styles.statusBoxTitulo}>Motivo do encerramento</Text>
+                  </View>
+                  <Text style={styles.statusBoxSub}>Descreva o motivo pelo qual este medicamento foi encerrado.</Text>
+                  <TextInput
+                    style={styles.statusBoxInput}
+                    value={motivoEncerramento}
+                    onChangeText={setMotivoEncerramento}
+                    placeholder="Ex: Tratamento concluído, efeitos adversos..."
+                    placeholderTextColor="#C4B5FD"
+                    multiline
+                    numberOfLines={3}
+                    autoCorrect={false}
+                  />
+                </View>
+              )}
 
-              {/* Observações */}
-              <Campo
-                label="OBSERVAÇÕES"
-                value={observacoes}
-                onChangeText={setObservacoes}
-                placeholder="Ex: Tomar com água"
-                opcional
-              />
-
-              {/* Status */}
-              <SeletorOpcoes
-                label="STATUS"
-                value={status}
-                onChange={setStatus}
-                opcoes={[
-                  { label: 'Ativo', valor: 'ativo' },
-                  { label: 'Pausado', valor: 'pausado' },
-                  { label: 'Encerrado', valor: 'encerrado' },
-                ]}
-              />
-
-              <TouchableOpacity
-                onPress={salvar}
-                disabled={carregando}
-                activeOpacity={0.85}
-                style={styles.botaoSalvarWrapper}
-              >
+              <TouchableOpacity onPress={salvar} disabled={carregando} activeOpacity={0.85} style={styles.botaoSalvarWrapper}>
                 <LinearGradient
-                  colors={['#6B49AD', '#481D94']}
+                  colors={['#6B49AD', '#6843B1', '#481D94']}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                   style={[styles.botaoSalvar, carregando && { opacity: 0.6 }]}
                 >
@@ -1055,15 +981,15 @@ export default function Medicamentos() {
 
       {/* Modal excluir */}
       <Modal visible={modalExcluir} transparent animationType="fade">
-        <View style={styles.modalExcluirFundo}>
-          <View style={styles.modalExcluirCard}>
+        <View style={styles.modalCentroFundo}>
+          <View style={styles.modalCentroCard}>
             <View style={styles.modalExcluirIcone}>
               <Feather name="trash-2" size={32} color="#dc2626" />
             </View>
-            <Text style={styles.modalExcluirTitulo}>Excluir medicamento?</Text>
-            <Text style={styles.modalExcluirMsg}>Esta ação não pode ser desfeita.</Text>
+            <Text style={styles.modalCentroTitulo}>Excluir medicamento?</Text>
+            <Text style={styles.modalCentroMsg}>Esta ação não pode ser desfeita.</Text>
             <TouchableOpacity onPress={excluir} activeOpacity={0.85} style={styles.btnExcluirConfirmar}>
-              <Text style={styles.btnExcluirConfirmarTexto}>SIM, EXCLUIR</Text>
+              <Text style={styles.btnConfirmarTexto}>SIM, EXCLUIR</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setModalExcluir(false)} style={styles.btnCancelar}>
               <Text style={styles.btnCancelarTexto}>Cancelar</Text>
@@ -1072,174 +998,123 @@ export default function Medicamentos() {
         </View>
       </Modal>
 
+      {/* Modal pausar — roxo */}
+      <Modal visible={modalPausar} transparent animationType="fade">
+        <View style={styles.modalCentroFundo}>
+          <View style={styles.modalCentroCard}>
+            <LinearGradient
+              colors={['#6B49AD', '#481D94']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={styles.modalRoxoHeader}
+            >
+              <Feather name="pause-circle" size={28} color="#fff" />
+              <Text style={styles.modalRoxoTitulo}>Pausar medicamento</Text>
+            </LinearGradient>
+            <View style={styles.modalRoxoBody}>
+              <Text style={styles.modalRoxoPergunta}>O medicamento ficará pausado até a data de retorno que você definir no formulário.</Text>
+              <TouchableOpacity onPress={() => setModalPausar(false)} activeOpacity={0.85} style={styles.btnRoxoConfirmar}>
+                <LinearGradient
+                  colors={['#6B49AD', '#481D94']}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  style={styles.btnRoxoGradient}
+                >
+                  <Text style={styles.btnConfirmarTexto}>ENTENDI</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <ModalAlerta visivel={modalAlerta.visivel} titulo={modalAlerta.titulo} mensagem={modalAlerta.mensagem}
+        onFechar={() => setModalAlerta(m => ({ ...m, visivel: false }))} />
+      <ModalAlerta visivel={modalSucesso.visivel} titulo={modalSucesso.titulo} mensagem={modalSucesso.mensagem}
+        onFechar={() => setModalSucesso(m => ({ ...m, visivel: false }))} />
     </SafeAreaView>
   )
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F5F0FF' },
 
-  // ── Cards da tela de lista ─────────────────────────────────────────────────
-
   cardPerfil: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 24,
-    padding: 16,
-    shadowColor: '#6B49AD',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
+    backgroundColor: '#fff', marginHorizontal: 16, marginTop: 16,
+    borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1, shadowRadius: 12, elevation: 5,
   },
-  cardPerfilConteudo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  fotoPerfil: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 2,
-    borderColor: '#E2D9F3',
-  },
+  fotoPerfil: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#E2D9F3' },
   fotoPerfilPlaceholder: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#EDE8FA',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#E2D9F3',
+    width: 44, height: 44, borderRadius: 22, backgroundColor: '#EDE8FA',
+    justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#E2D9F3',
   },
-  logoArea: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 4,
-  },
-  logo: {
-    width: 100,
-    height: 36,
-  },
-  perfilBoasVindas: {
-    fontSize: 13,
-    color: '#9163CB',
-    fontWeight: '600',
-  },
+  logo: { width: 110, height: 36 },
   voltarBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F0EAFF',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 36, height: 36, borderRadius: 18, backgroundColor: '#F0EAFF',
+    justifyContent: 'center', alignItems: 'center',
   },
 
   cardTituloLista: {
-    marginHorizontal: 16,
-    marginTop: 14,
-    borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#481D94',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 6,
+    marginHorizontal: 16, marginTop: 12, borderRadius: 50,
+    paddingVertical: 14, alignItems: 'center',
+    shadowColor: '#481D94', shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2, shadowRadius: 8, elevation: 5,
   },
-  cardTituloGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 18,
-    gap: 10,
+  cardTituloTexto: { fontSize: 14, fontWeight: '800', color: '#fff', letterSpacing: 3 },
+
+  botoesAcao: {
+    marginHorizontal: 16, marginTop: 10,
+    flexDirection: 'row', justifyContent: 'space-between',
   },
-  cardTituloTexto: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#fff',
-    letterSpacing: 1.5,
+  btnAcaoSecundario: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderWidth: 1.5, borderColor: '#481D94', borderRadius: 50,
+    paddingHorizontal: 16, paddingVertical: 10,
+    backgroundColor: 'rgba(107,73,173,0.08)',
   },
-  btnNovoHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+  btnAcaoSecundarioTexto: { fontSize: 13, fontWeight: '700', color: '#481D94' },
+  btnAcaoPrimario: {
+    borderRadius: 50,
+    shadowColor: '#481D94', shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3, shadowRadius: 8, elevation: 5,
   },
-  btnNovoHeaderTexto: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 14,
+  btnAcaoPrimarioGradient: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderRadius: 50, paddingHorizontal: 18, paddingVertical: 10,
   },
+  btnAcaoPrimarioTexto: { fontSize: 13, fontWeight: '700', color: '#fff' },
 
   cardLista: {
-    marginHorizontal: 16,
-    marginTop: 14,
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    padding: 16,
-    shadowColor: '#6B49AD',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-    gap: 12,
+    marginHorizontal: 16, marginTop: 14, backgroundColor: '#fff',
+    borderRadius: 24, padding: 16,
+    shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08, shadowRadius: 12, elevation: 4, gap: 14,
   },
-
   vazioContainer: { alignItems: 'center', paddingVertical: 40, gap: 10 },
   vazioIcone: {
-    width: 76,
-    height: 76,
-    borderRadius: 24,
-    backgroundColor: '#EDE8FA',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 4,
+    width: 76, height: 76, borderRadius: 24, backgroundColor: '#EDE8FA',
+    justifyContent: 'center', alignItems: 'center', marginBottom: 4,
   },
   vazioTitulo: { fontSize: 17, fontWeight: '700', color: '#301971' },
   vazioSub: { fontSize: 14, color: '#9163CB' },
 
-  // ── Cards de medicamentos ──────────────────────────────────────────────────
-
-  card: {
-    backgroundColor: '#FAFAFE',
-    borderRadius: 18,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#EDE8FA',
-    gap: 12,
-  },
-  cardTopo: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  cardIconeBox: { width: 46, height: 46, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  cardTextos: { flex: 1, gap: 5 },
-  cardNome: { fontSize: 16, fontWeight: '700', color: '#301971' },
-  tagStatus: { alignSelf: 'flex-start', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 },
+  card: { backgroundColor: '#FAFAFE', borderRadius: 20, padding: 18, borderWidth: 1, borderColor: '#EDE8FA' },
+  cardTopo: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  cardIconeBox: { width: 48, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  cardTextos: { flex: 1, gap: 6 },
+  cardNome: { fontSize: 17, fontWeight: '800', color: '#301971' },
+  tagStatus: { alignSelf: 'flex-start', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4 },
   tagStatusTexto: { fontSize: 12, fontWeight: '700' },
   cardAcoes: { flexDirection: 'row', gap: 8 },
-  btnEditar: {
-    width: 38, height: 38, borderRadius: 12,
-    backgroundColor: '#F0EAFF', justifyContent: 'center', alignItems: 'center',
-  },
-  btnExcluirCard: {
-    width: 38, height: 38, borderRadius: 12,
-    backgroundColor: '#FFF1F2', justifyContent: 'center', alignItems: 'center',
-  },
-  cardInfoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  infoItem: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: '#F0EAFF', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5,
-  },
-  infoTexto: { fontSize: 13, color: '#6B49AD', fontWeight: '600' },
-
-  // ── Modal ─────────────────────────────────────────────────────────────────
+  btnEditar: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#F0EAFF', justifyContent: 'center', alignItems: 'center' },
+  btnExcluirCard: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#FFF1F2', justifyContent: 'center', alignItems: 'center' },
+  cardDivisor: { height: 1, backgroundColor: '#EDE8FA', marginVertical: 14 },
+  cardInfos: { gap: 10 },
+  infoLinha: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  infoLinhaLabel: { fontSize: 13, fontWeight: '700', color: '#9163CB', width: 72 },
+  infoLinhaTexto: { fontSize: 14, fontWeight: '600', color: '#301971', flexShrink: 1 },
+  infoLinhaDestaque: { backgroundColor: '#EDE8FA', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 },
 
   modalFundo: { flex: 1 },
   modalOverlay: { flex: 1, backgroundColor: '#00000055' },
@@ -1247,194 +1122,143 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28,
     padding: 24, maxHeight: height * 0.92,
   },
-  modalHandle: {
-    width: 40, height: 4, borderRadius: 2, backgroundColor: '#E2D9F3',
-    alignSelf: 'center', marginBottom: 20,
-  },
+  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E2D9F3', alignSelf: 'center', marginBottom: 20 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
   modalTitulo: { fontSize: 19, fontWeight: '800', color: '#301971' },
-  modalFechar: {
-    width: 40, height: 40, borderRadius: 12,
-    backgroundColor: '#F0EAFF', justifyContent: 'center', alignItems: 'center',
-  },
-
+  modalFechar: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F0EAFF', justifyContent: 'center', alignItems: 'center' },
   duasColunas: { flexDirection: 'row', gap: 12 },
   coluna: { flex: 1 },
 
-  // ── Campos do formulário ──────────────────────────────────────────────────
-
-  campoWrapper: { marginBottom: 18 },
-  campoLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  campoWrapper: { marginBottom: 20 },
+  campoLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   campoLabel: { fontSize: 11, fontWeight: '700', color: '#9163CB', letterSpacing: 1.2 },
-
+  asterisco: { fontSize: 13, fontWeight: '800', color: '#481D94', lineHeight: 16 },
   tagOpcional: {
     backgroundColor: '#EDE8FA', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3,
     borderWidth: 1, borderColor: '#C4B5FD',
   },
-  tagOpcionalTexto: { fontSize: 10, fontWeight: '700', color: '#7C3AED', letterSpacing: 0.5 },
-
-  tagObrigatorio: {
-    backgroundColor: '#FFF1F2', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3,
-    borderWidth: 1, borderColor: '#FECACA',
-  },
-  tagObrigatorioTexto: { fontSize: 10, fontWeight: '700', color: '#dc2626', letterSpacing: 0.5 },
-
-  // Input arredondado com borda roxa — estilo da referência
+  tagOpcionalTexto: { fontSize: 10, fontWeight: '700', color: '#481D94', letterSpacing: 0.5 },
   input: {
-    borderWidth: 1.5,
-    borderColor: '#C4B5FD',
-    borderRadius: 50,
-    paddingHorizontal: 20,
-    paddingVertical: Platform.OS === 'ios' ? 16 : 13,
-    fontSize: 15,
-    color: '#301971',
-    backgroundColor: '#FAFAFE',
+    borderWidth: 1.5, borderColor: '#481D94', borderRadius: 50,
+    paddingHorizontal: 20, paddingVertical: Platform.OS === 'ios' ? 16 : 13,
+    fontSize: 15, color: '#301971', backgroundColor: '#FAFAFE',
   },
-  inputErro: {
-    borderColor: '#f87171',
-    backgroundColor: '#FFF5F5',
-  },
-
-  // Input de horário com ícone à esquerda
+  inputErro: { borderColor: '#f87171', backgroundColor: '#FFF5F5' },
   horarioInputWrapper: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#C4B5FD',
-    borderRadius: 50,
-    backgroundColor: '#FAFAFE',
-    paddingHorizontal: 16,
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1.5, borderColor: '#481D94', borderRadius: 50,
+    backgroundColor: '#FAFAFE', paddingHorizontal: 16,
   },
-  horarioIcIcoe: { marginRight: 8 },
-  inputHorario: {
-    flex: 1,
-    paddingVertical: Platform.OS === 'ios' ? 14 : 11,
-    fontSize: 15,
-    color: '#301971',
-  },
-
-  dicaTexto: { fontSize: 12, color: '#9163CB', marginTop: 8, marginLeft: 16 },
-
-  erroRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6, marginLeft: 16 },
+  horarioInputErro: { borderColor: '#f87171', backgroundColor: '#FFF5F5' },
+  horarioIcoe: { marginRight: 8 },
+  inputHorario: { flex: 1, paddingVertical: Platform.OS === 'ios' ? 14 : 11, fontSize: 15, color: '#301971' },
+  dicaTexto: { fontSize: 12, color: '#9163CB', marginTop: 6, marginLeft: 4 },
+  erroRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6, marginLeft: 4 },
   erroTexto: { fontSize: 12, color: '#dc2626', fontWeight: '600' },
 
-  // ── Aviso azulado / roxo ──────────────────────────────────────────────────
-
   avisoBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    backgroundColor: '#EDE8FA',
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 14,
-    borderLeftWidth: 3,
-    borderLeftColor: '#6B49AD',
+    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+    backgroundColor: '#F0EAFF', borderRadius: 14, padding: 12,
+    marginBottom: 14, borderLeftWidth: 3, borderLeftColor: '#481D94',
   },
-  avisoTexto: {
-    flex: 1,
-    fontSize: 13,
-    color: '#6B49AD',
-    lineHeight: 18,
-    fontWeight: '500',
-  },
+  avisoTexto: { flex: 1, fontSize: 13, color: '#481D94', lineHeight: 18, fontWeight: '500' },
 
-  // ── Horários ──────────────────────────────────────────────────────────────
+  statusBox: {
+    backgroundColor: '#EDE8FA', borderRadius: 18, padding: 18,
+    marginBottom: 20, borderWidth: 1.5, borderColor: '#C4B5FD',
+  },
+  statusBoxHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  statusBoxTitulo: { fontSize: 14, fontWeight: '700', color: '#481D94' },
+  statusBoxSub: { fontSize: 13, color: '#6B49AD', marginBottom: 14, lineHeight: 18 },
+  statusBoxInput: {
+    borderWidth: 1.5, borderColor: '#481D94', borderRadius: 18,
+    paddingHorizontal: 16, paddingVertical: 14,
+    fontSize: 15, color: '#301971', backgroundColor: '#fff',
+    textAlignVertical: 'top', minHeight: 80,
+  },
 
   horarioRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
-  btnRemoverHorario: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: '#FFF1F2', justifyContent: 'center', alignItems: 'center',
-  },
+  btnRemoverHorario: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFF1F2', justifyContent: 'center', alignItems: 'center' },
   btnAdicionarHorario: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingVertical: 10, paddingHorizontal: 18,
     backgroundColor: '#F0EAFF', borderRadius: 50, alignSelf: 'flex-start',
-    borderWidth: 1.5, borderColor: '#C4B5FD',
+    borderWidth: 1.5, borderColor: '#C4B5FD', marginTop: 4,
   },
   btnAdicionarTexto: { fontSize: 13, fontWeight: '700', color: '#6B49AD' },
 
-  // ── Dias da semana ────────────────────────────────────────────────────────
-
   diasRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   diaPilula: {
-    flex: 1,
-    minWidth: 44,
-    paddingVertical: 12,
-    borderRadius: 50,
-    borderWidth: 1.5,
-    borderColor: '#C4B5FD',
-    backgroundColor: '#FAFAFE',
-    alignItems: 'center',
+    flex: 1, minWidth: 40, paddingVertical: 12, borderRadius: 50,
+    borderWidth: 1.5, borderColor: '#481D94', backgroundColor: '#FAFAFE', alignItems: 'center',
   },
   diaPilulaAtiva: { backgroundColor: '#6B49AD', borderColor: '#6B49AD' },
   diaPilulaErro: { borderColor: '#f87171', backgroundColor: '#FFF5F5' },
-  diaTexto: { fontSize: 13, fontWeight: '700', color: '#9163CB' },
+  diaTexto: { fontSize: 12, fontWeight: '700', color: '#9163CB' },
   diaTextoAtivo: { color: '#fff' },
-
-  // ── Dias do mês ───────────────────────────────────────────────────────────
 
   diasMesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   diaMesItem: {
-    width: 42, height: 42, borderRadius: 21,
-    borderWidth: 1.5, borderColor: '#C4B5FD',
-    backgroundColor: '#FAFAFE',
-    justifyContent: 'center', alignItems: 'center',
+    width: 40, height: 40, borderRadius: 20, borderWidth: 1.5,
+    borderColor: '#481D94', backgroundColor: '#FAFAFE', justifyContent: 'center', alignItems: 'center',
   },
   diaMesItemAtivo: { backgroundColor: '#6B49AD', borderColor: '#6B49AD' },
   diaMesItemErro: { borderColor: '#f87171', backgroundColor: '#FFF5F5' },
-  diaMesTexto: { fontSize: 13, fontWeight: '700', color: '#9163CB' },
+  diaMesTexto: { fontSize: 12, fontWeight: '700', color: '#9163CB' },
   diaMesTextoAtivo: { color: '#fff' },
-
-  // ── Seletor de opções ─────────────────────────────────────────────────────
 
   seletorRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   seletorOpcao: {
-    flex: 1,
-    paddingVertical: 13,
-    borderRadius: 50,
-    borderWidth: 1.5,
-    borderColor: '#C4B5FD',
-    alignItems: 'center',
-    backgroundColor: '#FAFAFE',
-    minWidth: 70,
+    flex: 1, paddingVertical: 13, borderRadius: 50, borderWidth: 1.5,
+    borderColor: '#481D94', alignItems: 'center', backgroundColor: '#FAFAFE', minWidth: 70,
   },
   seletorOpcaoAtiva: { backgroundColor: '#EDE8FA', borderColor: '#6B49AD' },
   seletorTexto: { fontSize: 13, fontWeight: '600', color: '#9163CB' },
   seletorTextoAtivo: { color: '#301971', fontWeight: '800' },
 
-  // ── Botão salvar ──────────────────────────────────────────────────────────
-
   botaoSalvarWrapper: {
-    marginTop: 8,
-    shadowColor: '#481D94',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    marginTop: 8, shadowColor: '#481D94',
+    shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
   },
   botaoSalvar: { borderRadius: 50, paddingVertical: 18, alignItems: 'center' },
   botaoSalvarTexto: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 2 },
 
-  // ── Modal excluir ─────────────────────────────────────────────────────────
-
-  modalExcluirFundo: { flex: 1, backgroundColor: '#00000066', justifyContent: 'flex-end' },
-  modalExcluirCard: {
-    backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    padding: 32, alignItems: 'center', gap: 12,
+  modalCentroFundo: {
+    flex: 1, backgroundColor: '#00000066', justifyContent: 'center',
+    alignItems: 'center', paddingHorizontal: 28,
+  },
+  modalCentroCard: {
+    backgroundColor: '#fff', borderRadius: 28, width: '100%', overflow: 'hidden',
+    shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2, shadowRadius: 20, elevation: 12,
   },
   modalExcluirIcone: {
     width: 72, height: 72, borderRadius: 24, backgroundColor: '#FFF1F2',
-    justifyContent: 'center', alignItems: 'center', marginBottom: 8,
+    justifyContent: 'center', alignItems: 'center', alignSelf: 'center', marginTop: 28, marginBottom: 4,
   },
-  modalExcluirTitulo: { fontSize: 20, fontWeight: '800', color: '#301971' },
-  modalExcluirMsg: { fontSize: 15, color: '#6B49AD', marginBottom: 8 },
-  btnExcluirConfirmar: {
-    width: '100%', backgroundColor: '#dc2626',
-    borderRadius: 50, paddingVertical: 18, alignItems: 'center',
+  modalCentroTitulo: { fontSize: 20, fontWeight: '800', color: '#301971', textAlign: 'center', paddingHorizontal: 24 },
+  modalCentroMsg: { fontSize: 15, color: '#6B49AD', textAlign: 'center', paddingHorizontal: 24, marginTop: 8, marginBottom: 8 },
+  btnExcluirConfirmar: { marginHorizontal: 24, marginTop: 8, backgroundColor: '#dc2626', borderRadius: 50, paddingVertical: 16, alignItems: 'center' },
+
+  modalRoxoHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 24, paddingVertical: 20,
   },
-  btnExcluirConfirmarTexto: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 2 },
-  btnCancelar: { paddingVertical: 14 },
+  modalRoxoTitulo: { fontSize: 17, fontWeight: '800', color: '#fff' },
+  modalRoxoBody: { padding: 24 },
+  modalRoxoPergunta: { fontSize: 15, fontWeight: '600', color: '#301971', marginBottom: 16, lineHeight: 22 },
+  modalRoxoInput: {
+    borderWidth: 1.5, borderColor: '#481D94', borderRadius: 18,
+    paddingHorizontal: 16, paddingVertical: 14,
+    fontSize: 15, color: '#301971', backgroundColor: '#FAFAFE',
+    textAlignVertical: 'top', minHeight: 80, marginBottom: 20,
+  },
+  btnRoxoConfirmar: {
+    shadowColor: '#481D94', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
+  },
+  btnRoxoGradient: { borderRadius: 50, paddingVertical: 16, alignItems: 'center' },
+  btnConfirmarTexto: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 2 },
+  btnCancelar: { paddingVertical: 14, alignItems: 'center' },
   btnCancelarTexto: { fontSize: 15, fontWeight: '600', color: '#9163CB' },
 })
