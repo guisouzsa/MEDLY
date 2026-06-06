@@ -9,11 +9,12 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import ModalAlerta from '../../src/components/ModalAlerta'
-import { supabase } from '../../src/lib/supabase'
 import { salvarHistorico } from '../../src/lib/events'
+import { supabase } from '../../src/lib/supabase'
 
 const { height } = Dimensions.get('window')
 
+// ─── Tipos ────────────────────────────────────────────────────────────────────
 
 type Horario = {
   id: number
@@ -38,7 +39,9 @@ type Medicamento = {
   medicamento_horarios: Horario[]
 }
 
-const DIAS_SEMANA = [
+type Filtro = 'todos' | 'ativo' | 'pausado' | 'encerrado'
+
+const DIAS_SEMANA_LABEL = [
   { label: 'Seg', valor: 1 },
   { label: 'Ter', valor: 2 },
   { label: 'Qua', valor: 3 },
@@ -48,6 +51,7 @@ const DIAS_SEMANA = [
   { label: 'Dom', valor: 0 },
 ]
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function converterData(data: string): string | null {
   if (!data || data.length < 10) return null
@@ -84,13 +88,6 @@ function dataEhPassada(data: string): boolean {
   return dataInformada < agora
 }
 
-function tagStatusCor(status: string) {
-  if (status === 'ativo') return { bg: '#DCFCE7', cor: '#16A34A' }
-  if (status === 'pausado') return { bg: '#EDE8FA', cor: '#481D94' }
-  if (status === 'encerrado') return { bg: '#EDE8FA', cor: '#481D94' }
-  return { bg: '#EDE8FA', cor: '#481D94' }
-}
-
 function labelFrequencia(med: Medicamento): string {
   if (med.frequencia_tipo === 'diario') return 'Diário'
   if (med.frequencia_tipo === 'semanal') return 'Semanal'
@@ -99,9 +96,17 @@ function labelFrequencia(med: Medicamento): string {
   return med.frequencia_tipo
 }
 
+function statusCor(status: string): { bg: string; cor: string } {
+  if (status === 'ativo') return { bg: '#DCFCE7', cor: '#16A34A' }
+  if (status === 'pausado') return { bg: '#FFF3E0', cor: '#EF6C00' }
+  return { bg: '#EDE8FA', cor: '#481D94' }
+}
+
+// ─── Componentes internos ─────────────────────────────────────────────────────
 
 function Campo({
-  label, value, onChangeText, placeholder, keyboardType = 'default' as any,
+  label, value, onChangeText, placeholder,
+  keyboardType = 'default' as any,
   opcional = false, dica, erro, erroTexto,
 }: {
   label: string
@@ -129,7 +134,7 @@ function Campo({
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor="#C4B5FD"
+        placeholderTextColor="#9163CB"
         keyboardType={keyboardType}
         autoCorrect={false}
       />
@@ -143,7 +148,6 @@ function Campo({
     </View>
   )
 }
-
 
 function SeletorOpcoes<T extends string>({
   label, opcoes, value, onChange,
@@ -173,10 +177,8 @@ function SeletorOpcoes<T extends string>({
   )
 }
 
-
 function GrupoHorarios({
-  horarios, onAdicionar, onRemover, onAtualizar,
-  label = 'HORÁRIOS', descricao, erro,
+  horarios, onAdicionar, onRemover, onAtualizar, label = 'HORÁRIOS', descricao, erro,
 }: {
   horarios: string[]
   onAdicionar: () => void
@@ -198,13 +200,13 @@ function GrupoHorarios({
       {horarios.map((h, index) => (
         <View key={index} style={styles.horarioRow}>
           <View style={[styles.horarioInputWrapper, erro && h.length < 5 && styles.horarioInputErro]}>
-            <Feather name="clock" size={16} color="#9163CB" style={styles.horarioIcoe} />
+            <Feather name="clock" size={16} color="#9163CB" style={{ marginRight: 8 }} />
             <TextInput
               style={styles.inputHorario}
               value={h}
               onChangeText={(t) => onAtualizar(index, t)}
               placeholder="Ex: 08:00"
-              placeholderTextColor="#C4B5FD"
+              placeholderTextColor="#9163CB"
               keyboardType="numeric"
               autoCorrect={false}
             />
@@ -230,6 +232,195 @@ function GrupoHorarios({
   )
 }
 
+// ─── Card de medicamento colapsável ──────────────────────────────────────────
+
+function CardMedicamento({
+  med,
+  onEditar,
+  onExcluir,
+}: {
+  med: Medicamento
+  onEditar: () => void
+  onExcluir: () => void
+}) {
+  const [expandido, setExpandido] = useState(false)
+  const sc = statusCor(med.status)
+
+  // Horários formatados
+  const hs = med.medicamento_horarios ?? []
+  function renderHorariosTexto(): string | null {
+    if (med.frequencia_tipo === 'diario') {
+      const h = hs.map(x => x.horario.slice(0, 5)).join(' · ')
+      return h || null
+    }
+    if (med.frequencia_tipo === 'semanal') {
+      const horariosUnicos = [...new Set(hs.map(x => x.horario.slice(0, 5)))]
+      return horariosUnicos.length > 0 ? horariosUnicos.join(' · ') : null
+    }
+    if (med.frequencia_tipo === 'mensal') {
+      const horariosUnicos = [...new Set(hs.map(x => x.horario.slice(0, 5)))]
+      return horariosUnicos.length > 0 ? horariosUnicos.join(' · ') : null
+    }
+    if (med.frequencia_tipo === 'personalizado' && med.intervalo_horas) {
+      return `A cada ${med.intervalo_horas}h`
+    }
+    return null
+  }
+  function renderDiasTexto(): string | null {
+    if (med.frequencia_tipo === 'semanal') {
+      const dias = [...new Set(hs.map(x => DIAS_SEMANA_LABEL.find(d => d.valor === x.dia_semana)?.label ?? ''))].filter(Boolean)
+      return dias.length > 0 ? dias.join(', ') : null
+    }
+    if (med.frequencia_tipo === 'mensal') {
+      const dias = [...new Set(hs.map(x => x.dia_mes))].filter(Boolean).sort((a, b) => (a ?? 0) - (b ?? 0))
+      return dias.length > 0 ? `Dias ${dias.join(', ')}` : null
+    }
+    return null
+  }
+
+  const horariosTexto = renderHorariosTexto()
+  const diasTexto = renderDiasTexto()
+
+  const temDetalhes = !!(
+    med.quantidade_por_dose || horariosTexto || diasTexto ||
+    med.data_termino || med.data_retorno || med.motivo_encerramento || med.observacoes
+  )
+
+  return (
+    <View style={styles.card}>
+      {/* Topo sempre visível */}
+      <View style={styles.cardTopo}>
+        <LinearGradient
+          colors={med.status === 'ativo' ? ['#6B49AD', '#481D94'] : ['#9163CB', '#7C4FBD']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={styles.cardIconeBox}
+        >
+          <Feather name="activity" size={22} color="#fff" />
+        </LinearGradient>
+        <View style={styles.cardTextos}>
+          <Text style={styles.cardNome}>{med.nome}</Text>
+          {med.dosagem ? <Text style={styles.cardSubtitulo}>{med.dosagem}</Text> : null}
+        </View>
+        <View style={styles.cardAcoes}>
+          <TouchableOpacity style={styles.btnEditar} onPress={onEditar}>
+            <Feather name="edit-2" size={17} color="#6B49AD" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.btnExcluirCard} onPress={onExcluir}>
+            <Feather name="trash-2" size={17} color="#dc2626" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.cardDivisor} />
+
+      {/* Infos sempre visíveis */}
+      <View style={styles.cardInfos}>
+        {/* Badge status */}
+        <View style={[styles.badgeStatus, { backgroundColor: sc.bg }]}>
+          <Feather
+            name={med.status === 'ativo' ? 'check-circle' : med.status === 'pausado' ? 'pause-circle' : 'x-circle'}
+            size={11}
+            color={sc.cor}
+          />
+          <Text style={[styles.badgeStatusTexto, { color: sc.cor }]}>
+            {med.status.charAt(0).toUpperCase() + med.status.slice(1)}
+          </Text>
+        </View>
+
+        <View style={styles.infoLinha}>
+          <Feather name="refresh-cw" size={15} color="#6B49AD" />
+          <Text style={styles.infoLinhaLabel}>Frequência</Text>
+          <Text style={styles.infoLinhaTexto}>{labelFrequencia(med)}</Text>
+        </View>
+
+        {med.data_inicio ? (
+          <View style={styles.infoLinha}>
+            <Feather name="calendar" size={15} color="#6B49AD" />
+            <Text style={styles.infoLinhaLabel}>Início</Text>
+            <Text style={styles.infoLinhaTexto}>{formatarDataParaTela(med.data_inicio)}</Text>
+          </View>
+        ) : null}
+      </View>
+
+      {/* Detalhes expandidos */}
+      {expandido && temDetalhes && (
+        <View style={styles.cardDetalhes}>
+          <View style={styles.cardDivisor} />
+
+          {med.quantidade_por_dose ? (
+            <View style={styles.infoLinha}>
+              <Feather name="package" size={15} color="#6B49AD" />
+              <Text style={styles.infoLinhaLabel}>Por dose</Text>
+              <Text style={styles.infoLinhaTexto}>{med.quantidade_por_dose}</Text>
+            </View>
+          ) : null}
+
+          {diasTexto ? (
+            <View style={styles.infoLinha}>
+              <Feather name="calendar" size={15} color="#6B49AD" />
+              <Text style={styles.infoLinhaLabel}>Dias</Text>
+              <Text style={styles.infoLinhaTexto}>{diasTexto}</Text>
+            </View>
+          ) : null}
+
+          {horariosTexto ? (
+            <View style={styles.infoLinha}>
+              <Feather name="clock" size={15} color="#6B49AD" />
+              <Text style={styles.infoLinhaLabel}>Horários</Text>
+              <Text style={styles.infoLinhaTexto}>{horariosTexto}</Text>
+            </View>
+          ) : null}
+
+          {med.data_termino ? (
+            <View style={styles.infoLinha}>
+              <Feather name="calendar" size={15} color="#6B49AD" />
+              <Text style={styles.infoLinhaLabel}>Término</Text>
+              <Text style={styles.infoLinhaTexto}>{formatarDataParaTela(med.data_termino)}</Text>
+            </View>
+          ) : null}
+
+          {med.status === 'pausado' && med.data_retorno ? (
+            <View style={styles.infoLinha}>
+              <Feather name="clock" size={15} color="#6B49AD" />
+              <Text style={styles.infoLinhaLabel}>Retorno</Text>
+              <Text style={styles.infoLinhaTexto}>{formatarDataParaTela(med.data_retorno)}</Text>
+            </View>
+          ) : null}
+
+          {med.status === 'encerrado' && med.motivo_encerramento ? (
+            <View style={[styles.infoLinha, { alignItems: 'flex-start' }]}>
+              <Feather name="x-circle" size={15} color="#6B49AD" style={{ marginTop: 2 }} />
+              <Text style={styles.infoLinhaLabel}>Motivo</Text>
+              <Text style={[styles.infoLinhaTexto, { flex: 1 }]}>{med.motivo_encerramento}</Text>
+            </View>
+          ) : null}
+
+          {med.observacoes ? (
+            <View style={[styles.infoLinha, { alignItems: 'flex-start' }]}>
+              <Feather name="file-text" size={15} color="#6B49AD" style={{ marginTop: 2 }} />
+              <Text style={styles.infoLinhaLabel}>Obs.</Text>
+              <Text style={[styles.infoLinhaTexto, { flex: 1 }]}>{med.observacoes}</Text>
+            </View>
+          ) : null}
+        </View>
+      )}
+
+      {/* Botão ver mais / ver menos */}
+      {temDetalhes && (
+        <TouchableOpacity
+          onPress={() => setExpandido(e => !e)}
+          activeOpacity={0.7}
+          style={styles.verMaisBtn}
+        >
+          <Text style={styles.verMaisTexto}>{expandido ? 'Ver menos' : 'Ver mais'}</Text>
+          <Feather name={expandido ? 'chevron-up' : 'chevron-down'} size={14} color="#6B49AD" />
+        </TouchableOpacity>
+      )}
+    </View>
+  )
+}
+
+// ─── Tela principal ───────────────────────────────────────────────────────────
 
 export default function Medicamentos() {
   const { action } = useLocalSearchParams()
@@ -237,6 +428,7 @@ export default function Medicamentos() {
   const [usuarioId, setUsuarioId] = useState<string | null>(null)
   const [lista, setLista] = useState<Medicamento[]>([])
   const [perfilFoto, setPerfilFoto] = useState<string | null>(null)
+  const [filtro, setFiltro] = useState<Filtro>('todos')
 
   const [modalVisivel, setModalVisivel] = useState(false)
   const [editando, setEditando] = useState<Medicamento | null>(null)
@@ -262,14 +454,11 @@ export default function Medicamentos() {
 
   const [carregando, setCarregando] = useState(false)
   const [erros, setErros] = useState<Record<string, boolean>>({})
-
   const [modalExcluir, setModalExcluir] = useState(false)
   const [excluirId, setExcluirId] = useState<number | null>(null)
   const [modalAlerta, setModalAlerta] = useState({ visivel: false, titulo: '', mensagem: '' })
   const [modalSucesso, setModalSucesso] = useState({ visivel: false, titulo: '', mensagem: '' })
-
   const [modalPausar, setModalPausar] = useState(false)
-
 
   useEffect(() => {
     if (action === 'create') abrirModal()
@@ -295,7 +484,6 @@ export default function Medicamentos() {
     }, [])
   )
 
-
   async function buscar(uid?: string) {
     const id = uid ?? usuarioId
     if (!id) return
@@ -307,6 +495,15 @@ export default function Medicamentos() {
     if (error) { console.error('Erro ao buscar:', error.message); return }
     if (data) setLista(data as Medicamento[])
   }
+
+  const filtroLabels: Record<Filtro, string> = {
+    todos: 'Todos',
+    ativo: 'Ativos',
+    pausado: 'Pausados',
+    encerrado: 'Encerrados',
+  }
+
+  const listaFiltrada = filtro === 'todos' ? lista : lista.filter(m => m.status === filtro)
 
   function resetForm() {
     setNome(''); setDosagem(''); setFrequenciaTipo('diario')
@@ -333,7 +530,6 @@ export default function Medicamentos() {
       setStatus(med.status)
       setMotivoEncerramento(med.motivo_encerramento ?? '')
       setErros({})
-
       const hs = med.medicamento_horarios ?? []
       if (med.frequencia_tipo === 'diario') {
         setHorarios(hs.length > 0 ? hs.map(h => h.horario.slice(0, 5)) : [''])
@@ -364,9 +560,9 @@ export default function Medicamentos() {
   }
 
   function fecharModal() {
-    Animated.timing(slideAnim, { toValue: height, duration: 280, useNativeDriver: true }).start(() => setModalVisivel(false))
+    Animated.timing(slideAnim, { toValue: height, duration: 280, useNativeDriver: true })
+      .start(() => setModalVisivel(false))
   }
-
 
   function toggleDiaSemana(dia: number) {
     setDiasSemanaSelecionados(prev => prev.includes(dia) ? prev.filter(d => d !== dia) : [...prev, dia])
@@ -375,38 +571,11 @@ export default function Medicamentos() {
     setDiasMesSelecionados(prev => prev.includes(dia) ? prev.filter(d => d !== dia) : [...prev, dia])
   }
 
-
-  function adicionarHorario() { setHorarios(prev => [...prev, '']) }
-  function removerHorario(i: number) { setHorarios(prev => prev.filter((_, idx) => idx !== i)) }
-  function atualizarHorario(i: number, v: string) {
-    setHorarios(prev => prev.map((h, idx) => idx === i ? mascaraHorario(v) : h))
-  }
-  function adicionarHorarioSemanal() { setHorariosSemanal(prev => [...prev, '']) }
-  function removerHorarioSemanal(i: number) { setHorariosSemanal(prev => prev.filter((_, idx) => idx !== i)) }
-  function atualizarHorarioSemanal(i: number, v: string) {
-    setHorariosSemanal(prev => prev.map((h, idx) => idx === i ? mascaraHorario(v) : h))
-  }
-  function adicionarHorarioMensal() { setHorariosMensal(prev => [...prev, '']) }
-  function removerHorarioMensal(i: number) { setHorariosMensal(prev => prev.filter((_, idx) => idx !== i)) }
-  function atualizarHorarioMensal(i: number, v: string) {
-    setHorariosMensal(prev => prev.map((h, idx) => idx === i ? mascaraHorario(v) : h))
-  }
-
-
   function handleStatusChange(v: Medicamento['status']) {
-    if (v === 'pausado') {
-      setModalPausar(true)
-      setStatus(v)
-    } else if (v === 'encerrado') {
-      setStatus(v)
-      setDataRetorno('')
-    } else {
-      setStatus(v)
-      setMotivoEncerramento('')
-      setDataRetorno('')
-    }
+    if (v === 'pausado') { setModalPausar(true); setStatus(v) }
+    else if (v === 'encerrado') { setStatus(v); setDataRetorno('') }
+    else { setStatus(v); setMotivoEncerramento(''); setDataRetorno('') }
   }
-
 
   function validar(): boolean {
     const e: Record<string, boolean> = {}
@@ -435,7 +604,6 @@ export default function Medicamentos() {
     }
     return true
   }
-
 
   async function salvar() {
     if (!validar()) return
@@ -490,7 +658,9 @@ export default function Medicamentos() {
         if (erroHorarios) throw erroHorarios
       }
 
-      await salvarHistorico(usuarioId, editando ? `Medicamento ${nome.trim()} (${dosagem.trim()}) foi alterado` : `Medicamento ${nome.trim()} (${dosagem.trim()}) foi cadastrado`)
+      await salvarHistorico(usuarioId, editando
+        ? `Medicamento ${nome.trim()} (${dosagem.trim()}) foi alterado`
+        : `Medicamento ${nome.trim()} (${dosagem.trim()}) foi cadastrado`)
 
       fecharModal()
       await buscar()
@@ -507,32 +677,16 @@ export default function Medicamentos() {
     }
   }
 
-
   function confirmarExcluir(id: number) { setExcluirId(id); setModalExcluir(true) }
+
   async function excluir() {
     if (!excluirId) return
     const med = lista.find(m => m.id === excluirId)
     const { error } = await supabase.from('medicamentos').delete().eq('id', excluirId)
     if (error) { setModalAlerta({ visivel: true, titulo: 'Erro ao excluir', mensagem: error.message }); return }
-    if (med) {
-      await salvarHistorico(usuarioId!, `Medicamento ${med.nome} foi removido`)
-    }
+    if (med) await salvarHistorico(usuarioId!, `Medicamento ${med.nome} foi removido`)
     setModalExcluir(false); setExcluirId(null)
     await buscar()
-  }
-
-  function renderHorariosDiarios() {
-    return (
-      <GrupoHorarios
-        label="HORÁRIOS DO DIA"
-        descricao="Informe os horários em que o medicamento deve ser tomado."
-        horarios={horarios}
-        onAdicionar={adicionarHorario}
-        onRemover={removerHorario}
-        onAtualizar={(i, v) => { atualizarHorario(i, v); setErros(p => ({ ...p, horarioDiario: false })) }}
-        erro={erros.horarioDiario}
-      />
-    )
   }
 
   function renderSemanal() {
@@ -544,7 +698,7 @@ export default function Medicamentos() {
           <Text style={styles.avisoTexto}>Selecione os dias em que o medicamento será tomado.</Text>
         </View>
         <View style={styles.diasRow}>
-          {DIAS_SEMANA.map(({ label, valor }) => {
+          {DIAS_SEMANA_LABEL.map(({ label, valor }) => {
             const ativo = diasSemanaSelecionados.includes(valor)
             return (
               <TouchableOpacity
@@ -568,9 +722,9 @@ export default function Medicamentos() {
           label="HORÁRIOS"
           descricao="Esses horários valerão para todos os dias selecionados."
           horarios={horariosSemanal}
-          onAdicionar={adicionarHorarioSemanal}
-          onRemover={removerHorarioSemanal}
-          onAtualizar={(i, v) => { atualizarHorarioSemanal(i, v); setErros(p => ({ ...p, horarioSemanal: false })) }}
+          onAdicionar={() => setHorariosSemanal(p => [...p, ''])}
+          onRemover={(i) => setHorariosSemanal(p => p.filter((_, idx) => idx !== i))}
+          onAtualizar={(i, v) => { setHorariosSemanal(p => p.map((h, idx) => idx === i ? mascaraHorario(v) : h)); setErros(p => ({ ...p, horarioSemanal: false })) }}
           erro={erros.horarioSemanal}
         />
       </View>
@@ -611,90 +765,22 @@ export default function Medicamentos() {
           label="HORÁRIOS"
           descricao="Esses horários valerão para todos os dias selecionados."
           horarios={horariosMensal}
-          onAdicionar={adicionarHorarioMensal}
-          onRemover={removerHorarioMensal}
-          onAtualizar={(i, v) => { atualizarHorarioMensal(i, v); setErros(p => ({ ...p, horarioMensal: false })) }}
+          onAdicionar={() => setHorariosMensal(p => [...p, ''])}
+          onRemover={(i) => setHorariosMensal(p => p.filter((_, idx) => idx !== i))}
+          onAtualizar={(i, v) => { setHorariosMensal(p => p.map((h, idx) => idx === i ? mascaraHorario(v) : h)); setErros(p => ({ ...p, horarioMensal: false })) }}
           erro={erros.horarioMensal}
         />
       </View>
     )
   }
 
-
-  function renderInfoHorarios(med: Medicamento) {
-    const hs = med.medicamento_horarios ?? []
-    if (med.frequencia_tipo === 'diario') {
-      const horariosStr = hs.map(h => h.horario.slice(0, 5)).join(' · ')
-      if (!horariosStr) return null
-      return (
-        <View style={styles.infoLinha}>
-          <Feather name="clock" size={15} color="#6B49AD" />
-          <Text style={styles.infoLinhaLabel}>Horários</Text>
-          <Text style={styles.infoLinhaTexto}>{horariosStr}</Text>
-        </View>
-      )
-    }
-    if (med.frequencia_tipo === 'semanal') {
-      const dias = [...new Set(hs.map(h => DIAS_SEMANA.find(d => d.valor === h.dia_semana)?.label ?? ''))].filter(Boolean)
-      const horariosUnicos = [...new Set(hs.map(h => h.horario.slice(0, 5)))]
-      return (
-        <>
-          {dias.length > 0 && (
-            <View style={styles.infoLinha}>
-              <Feather name="calendar" size={15} color="#6B49AD" />
-              <Text style={styles.infoLinhaLabel}>Dias</Text>
-              <Text style={styles.infoLinhaTexto}>{dias.join(', ')}</Text>
-            </View>
-          )}
-          {horariosUnicos.length > 0 && (
-            <View style={styles.infoLinha}>
-              <Feather name="clock" size={15} color="#6B49AD" />
-              <Text style={styles.infoLinhaLabel}>Horários</Text>
-              <Text style={styles.infoLinhaTexto}>{horariosUnicos.join(' · ')}</Text>
-            </View>
-          )}
-        </>
-      )
-    }
-    if (med.frequencia_tipo === 'mensal') {
-      const dias = [...new Set(hs.map(h => h.dia_mes))].filter(Boolean).sort((a, b) => (a ?? 0) - (b ?? 0))
-      const horariosUnicos = [...new Set(hs.map(h => h.horario.slice(0, 5)))]
-      return (
-        <>
-          {dias.length > 0 && (
-            <View style={styles.infoLinha}>
-              <Feather name="calendar" size={15} color="#6B49AD" />
-              <Text style={styles.infoLinhaLabel}>Dias</Text>
-              <Text style={styles.infoLinhaTexto}>{dias.join(', ')}</Text>
-            </View>
-          )}
-          {horariosUnicos.length > 0 && (
-            <View style={styles.infoLinha}>
-              <Feather name="clock" size={15} color="#6B49AD" />
-              <Text style={styles.infoLinhaLabel}>Horários</Text>
-              <Text style={styles.infoLinhaTexto}>{horariosUnicos.join(' · ')}</Text>
-            </View>
-          )}
-        </>
-      )
-    }
-    if (med.frequencia_tipo === 'personalizado' && med.intervalo_horas) {
-      return (
-        <View style={styles.infoLinha}>
-          <Feather name="clock" size={15} color="#6B49AD" />
-          <Text style={styles.infoLinhaLabel}>Intervalo</Text>
-          <Text style={styles.infoLinhaTexto}>A cada {med.intervalo_horas}h</Text>
-        </View>
-      )
-    }
-    return null
-  }
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
 
-        {/* Card 1 — Perfil + Logo (menor) */}
+        {/* Card Perfil — idêntico ao exames */}
         <View style={styles.cardPerfil}>
           <TouchableOpacity onPress={() => router.push('/modulos/perfil' as any)} activeOpacity={0.85}>
             {perfilFoto ? (
@@ -711,144 +797,80 @@ export default function Medicamentos() {
           </TouchableOpacity>
         </View>
 
-        {/* Card 2 — REMÉDIOS (fino, centralizado, menor) */}
+        {/* Título — idêntico ao exames */}
         <LinearGradient
           colors={['#6B49AD', '#6843B1', '#481D94']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
           style={styles.cardTituloLista}
         >
-          <Text style={styles.cardTituloTexto}>REMÉDIOS</Text>
+          <Text style={styles.cardTituloTexto}>MEDICAMENTOS</Text>
         </LinearGradient>
 
-        {/* Botões abaixo do card REMÉDIOS — canto direito */}
-        <View style={styles.botoesAcao}>
-          <TouchableOpacity
-            onPress={() => router.push({ pathname: '/modulos/historico', params: { modulo: 'medicamento' } } as any)}
-            activeOpacity={0.85}
-            style={styles.btnAcaoSecundario}
-          >
-            <Feather name="clock" size={16} color="#6B49AD" />
-            <Text style={styles.btnAcaoSecundarioTexto}>Histórico</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => abrirModal()} activeOpacity={0.85} style={styles.btnAcaoPrimario}>
-            <LinearGradient
-              colors={['#6B49AD', '#481D94']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={styles.btnAcaoPrimarioGradient}
+        {/* Filtros — idênticos ao exames */}
+        <View style={styles.filtrosRow}>
+          {(['todos', 'ativo', 'pausado', 'encerrado'] as Filtro[]).map((f) => (
+            <TouchableOpacity
+              key={f}
+              onPress={() => setFiltro(f)}
+              activeOpacity={0.8}
+              style={[styles.chip, filtro === f && styles.chipAtivo]}
             >
-              <Feather name="plus" size={16} color="#fff" />
-              <Text style={styles.btnAcaoPrimarioTexto}>Cadastrar</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+              {filtro === f ? (
+                <LinearGradient
+                  colors={['#6B49AD', '#481D94']}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  style={styles.chipGradient}
+                >
+                  <Text style={styles.chipTextoAtivo}>{filtroLabels[f]}</Text>
+                </LinearGradient>
+              ) : (
+                <View style={styles.chipInner}>
+                  <Text style={styles.chipTexto}>{filtroLabels[f]}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
         </View>
 
-        {/* Card 3 — Lista */}
+        {/* Lista */}
         <View style={styles.cardLista}>
-          {lista.length === 0 ? (
+          {listaFiltrada.length === 0 ? (
             <View style={styles.vazioContainer}>
               <View style={styles.vazioIcone}>
                 <Feather name="activity" size={36} color="#9163CB" />
               </View>
-              <Text style={styles.vazioTitulo}>Nenhum medicamento</Text>
-              <Text style={styles.vazioSub}>Toque em "Cadastrar" para adicionar</Text>
+              <Text style={styles.vazioTitulo}>
+                {filtro === 'todos' ? 'Nenhum medicamento'
+                  : filtro === 'ativo' ? 'Nenhum medicamento ativo'
+                    : filtro === 'pausado' ? 'Nenhum medicamento pausado'
+                      : 'Nenhum medicamento encerrado'}
+              </Text>
+              <Text style={styles.vazioSub}>Toque em "+" para adicionar</Text>
             </View>
           ) : (
-            lista.map((med) => {
-              const cor = tagStatusCor(med.status)
-              return (
-                <View key={med.id} style={styles.card}>
-                  <View style={styles.cardTopo}>
-                    <LinearGradient
-                      colors={['#6B49AD', '#6843B1', '#481D94']}
-                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                      style={styles.cardIconeBox}
-                    >
-                      <Feather name="activity" size={22} color="#fff" />
-                    </LinearGradient>
-                    <View style={styles.cardTextos}>
-                      <Text style={styles.cardNome}>{med.nome}</Text>
-                      <View style={[styles.tagStatus, { backgroundColor: cor.bg }]}>
-                        <Text style={[styles.tagStatusTexto, { color: cor.cor }]}>
-                          {med.status.charAt(0).toUpperCase() + med.status.slice(1)}
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={styles.cardAcoes}>
-                      <TouchableOpacity style={styles.btnEditar} onPress={() => abrirModal(med)}>
-                        <Feather name="edit-2" size={17} color="#6B49AD" />
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.btnExcluirCard} onPress={() => confirmarExcluir(med.id)}>
-                        <Feather name="trash-2" size={17} color="#dc2626" />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  <View style={styles.cardDivisor} />
-
-                  <View style={styles.cardInfos}>
-                    {med.dosagem ? (
-                      <View style={styles.infoLinha}>
-                        <Feather name="droplet" size={15} color="#6B49AD" />
-                        <Text style={styles.infoLinhaLabel}>Dosagem</Text>
-                        <Text style={styles.infoLinhaTexto}>{med.dosagem}</Text>
-                      </View>
-                    ) : null}
-                    {med.quantidade_por_dose ? (
-                      <View style={styles.infoLinha}>
-                        <Feather name="package" size={15} color="#6B49AD" />
-                        <Text style={styles.infoLinhaLabel}>Por dose</Text>
-                        <Text style={styles.infoLinhaTexto}>{med.quantidade_por_dose}</Text>
-                      </View>
-                    ) : null}
-                    <View style={styles.infoLinha}>
-                      <Feather name="refresh-cw" size={15} color="#6B49AD" />
-                      <Text style={styles.infoLinhaLabel}>Frequência</Text>
-                      <Text style={styles.infoLinhaTexto}>{labelFrequencia(med)}</Text>
-                    </View>
-                    {renderInfoHorarios(med)}
-                    {med.data_inicio ? (
-                      <View style={styles.infoLinha}>
-                        <Feather name="calendar" size={15} color="#6B49AD" />
-                        <Text style={styles.infoLinhaLabel}>Início</Text>
-                        <Text style={styles.infoLinhaTexto}>{formatarDataParaTela(med.data_inicio)}</Text>
-                      </View>
-                    ) : null}
-                    {med.data_termino ? (
-                      <View style={styles.infoLinha}>
-                        <Feather name="calendar" size={15} color="#6B49AD" />
-                        <Text style={styles.infoLinhaLabel}>Término</Text>
-                        <Text style={styles.infoLinhaTexto}>{formatarDataParaTela(med.data_termino)}</Text>
-                      </View>
-                    ) : null}
-                    {med.status === 'pausado' && med.data_retorno ? (
-                      <View style={[styles.infoLinha, styles.infoLinhaDestaque]}>
-                        <Feather name="clock" size={15} color="#481D94" />
-                        <Text style={[styles.infoLinhaLabel, { color: '#481D94' }]}>Retorno</Text>
-                        <Text style={[styles.infoLinhaTexto, { color: '#481D94' }]}>{formatarDataParaTela(med.data_retorno)}</Text>
-                      </View>
-                    ) : null}
-                    {med.status === 'encerrado' && med.motivo_encerramento ? (
-                      <View style={[styles.infoLinha, styles.infoLinhaDestaque, { alignItems: 'flex-start' }]}>
-                        <Feather name="x-circle" size={15} color="#481D94" style={{ marginTop: 2 }} />
-                        <Text style={[styles.infoLinhaLabel, { color: '#481D94' }]}>Motivo</Text>
-                        <Text style={[styles.infoLinhaTexto, { color: '#481D94', flex: 1 }]}>{med.motivo_encerramento}</Text>
-                      </View>
-                    ) : null}
-                    {med.observacoes ? (
-                      <View style={[styles.infoLinha, { alignItems: 'flex-start' }]}>
-                        <Feather name="file-text" size={15} color="#6B49AD" style={{ marginTop: 2 }} />
-                        <Text style={styles.infoLinhaLabel}>Obs.</Text>
-                        <Text style={[styles.infoLinhaTexto, { flex: 1 }]}>{med.observacoes}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                </View>
-              )
-            })
+            listaFiltrada.map((med) => (
+              <CardMedicamento
+                key={med.id}
+                med={med}
+                onEditar={() => abrirModal(med)}
+                onExcluir={() => confirmarExcluir(med.id)}
+              />
+            ))
           )}
         </View>
+
       </ScrollView>
+
+      {/* FAB — idêntico ao exames */}
+      <TouchableOpacity onPress={() => abrirModal()} activeOpacity={0.85} style={styles.fab}>
+        <LinearGradient
+          colors={['#6B49AD', '#481D94']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={styles.fabGradient}
+        >
+          <Feather name="plus" size={26} color="#fff" />
+        </LinearGradient>
+      </TouchableOpacity>
 
       {/* Modal cadastro/edição */}
       <Modal visible={modalVisivel} transparent animationType="none">
@@ -869,13 +891,13 @@ export default function Medicamentos() {
                 placeholder="Ex: Paracetamol" erro={erros.nome} />
 
               <View style={styles.duasColunas}>
-                <View style={styles.coluna}>
+                <View style={[styles.coluna, { flex: 3 }]}>
                   <Campo label="DOSAGEM" value={dosagem}
                     onChangeText={(v) => { setDosagem(v); setErros(p => ({ ...p, dosagem: false })) }}
                     placeholder="Ex: 500mg" erro={erros.dosagem} />
                 </View>
-                <View style={styles.coluna}>
-                  <Campo label="QTDE POR DOSE" value={quantidadePorDose}
+                <View style={[styles.coluna, { flex: 2 }]}>
+                  <Campo label="QTDE/DOSE" value={quantidadePorDose}
                     onChangeText={(v) => { setQuantidadePorDose(v); setErros(p => ({ ...p, quantidadePorDose: false })) }}
                     placeholder="Ex: 1 comp." erro={erros.quantidadePorDose} />
                 </View>
@@ -889,7 +911,17 @@ export default function Medicamentos() {
                   { label: 'Custom', valor: 'personalizado' },
                 ]} />
 
-              {frequenciaTipo === 'diario' && renderHorariosDiarios()}
+              {frequenciaTipo === 'diario' && (
+                <GrupoHorarios
+                  label="HORÁRIOS DO DIA"
+                  descricao="Informe os horários em que o medicamento deve ser tomado."
+                  horarios={horarios}
+                  onAdicionar={() => setHorarios(p => [...p, ''])}
+                  onRemover={(i) => setHorarios(p => p.filter((_, idx) => idx !== i))}
+                  onAtualizar={(i, v) => { setHorarios(p => p.map((h, idx) => idx === i ? mascaraHorario(v) : h)); setErros(p => ({ ...p, horarioDiario: false })) }}
+                  erro={erros.horarioDiario}
+                />
+              )}
               {frequenciaTipo === 'semanal' && renderSemanal()}
               {frequenciaTipo === 'mensal' && renderMensal()}
               {frequenciaTipo === 'personalizado' && (
@@ -899,21 +931,25 @@ export default function Medicamentos() {
                   dica="O medicamento será lembrado a cada X horas a partir do início." />
               )}
 
-              <Campo label="DATA INÍCIO" value={dataInicio}
-                onChangeText={(t) => { setDataInicio(mascaraData(t)); setErros(p => ({ ...p, dataInicio: false, dataInicioPassada: false })) }}
-                placeholder="DD/MM/AAAA" keyboardType="numeric"
-                erro={erros.dataInicio || erros.dataInicioPassada}
-                erroTexto={erros.dataInicioPassada ? 'A data de início não pode ser uma data passada' : 'Este campo é obrigatório'} />
-
-              <Campo label="DATA TÉRMINO" value={dataTermino}
-                onChangeText={(t) => setDataTermino(mascaraData(t))}
-                placeholder="DD/MM/AAAA" keyboardType="numeric" opcional
-                dica="Deixe em branco se o uso for contínuo." />
+              <View style={styles.duasColunas}>
+                <View style={[styles.coluna, { flex: 3 }]}>
+                  <Campo label="DATA INÍCIO" value={dataInicio}
+                    onChangeText={(t) => { setDataInicio(mascaraData(t)); setErros(p => ({ ...p, dataInicio: false, dataInicioPassada: false })) }}
+                    placeholder="DD/MM/AAAA" keyboardType="numeric"
+                    erro={erros.dataInicio || erros.dataInicioPassada}
+                    erroTexto={erros.dataInicioPassada ? 'Data não pode ser passada' : 'Obrigatório'} />
+                </View>
+                <View style={[styles.coluna, { flex: 3 }]}>
+                  <Campo label="DATA TÉRMINO" value={dataTermino}
+                    onChangeText={(t) => setDataTermino(mascaraData(t))}
+                    placeholder="DD/MM/AAAA" keyboardType="numeric" opcional
+                    dica="Vazio = contínuo" />
+                </View>
+              </View>
 
               <Campo label="OBSERVAÇÕES" value={observacoes} onChangeText={setObservacoes}
                 placeholder="Ex: Tomar com água" opcional />
 
-              {/* Status */}
               <View style={styles.campoWrapper}>
                 <Text style={styles.campoLabel}>STATUS</Text>
                 <View style={styles.seletorRow}>
@@ -931,7 +967,6 @@ export default function Medicamentos() {
                 </View>
               </View>
 
-              {/* Box pausado */}
               {status === 'pausado' && (
                 <View style={styles.statusBox}>
                   <View style={styles.statusBoxHeader}>
@@ -946,7 +981,6 @@ export default function Medicamentos() {
                 </View>
               )}
 
-              {/* Box encerrado */}
               {status === 'encerrado' && (
                 <View style={styles.statusBox}>
                   <View style={styles.statusBoxHeader}>
@@ -959,7 +993,7 @@ export default function Medicamentos() {
                     value={motivoEncerramento}
                     onChangeText={setMotivoEncerramento}
                     placeholder="Ex: Tratamento concluído, efeitos adversos..."
-                    placeholderTextColor="#C4B5FD"
+                    placeholderTextColor="#9163CB"
                     multiline
                     numberOfLines={3}
                     autoCorrect={false}
@@ -969,7 +1003,7 @@ export default function Medicamentos() {
 
               <TouchableOpacity onPress={salvar} disabled={carregando} activeOpacity={0.85} style={styles.botaoSalvarWrapper}>
                 <LinearGradient
-                  colors={['#6B49AD', '#6843B1', '#481D94']}
+                  colors={['#6B49AD', '#481D94']}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                   style={[styles.botaoSalvar, carregando && { opacity: 0.6 }]}
                 >
@@ -986,15 +1020,15 @@ export default function Medicamentos() {
 
       {/* Modal excluir */}
       <Modal visible={modalExcluir} transparent animationType="fade">
-        <View style={styles.modalCentroFundo}>
-          <View style={styles.modalCentroCard}>
+        <View style={styles.modalExcluirFundo}>
+          <View style={styles.modalExcluirCard}>
             <View style={styles.modalExcluirIcone}>
               <Feather name="trash-2" size={32} color="#dc2626" />
             </View>
-            <Text style={styles.modalCentroTitulo}>Excluir medicamento?</Text>
-            <Text style={styles.modalCentroMsg}>Esta ação não pode ser desfeita.</Text>
+            <Text style={styles.modalExcluirTitulo}>Excluir medicamento?</Text>
+            <Text style={styles.modalExcluirMsg}>Esta ação não pode ser desfeita.</Text>
             <TouchableOpacity onPress={excluir} activeOpacity={0.85} style={styles.btnExcluirConfirmar}>
-              <Text style={styles.btnConfirmarTexto}>SIM, EXCLUIR</Text>
+              <Text style={styles.btnExcluirConfirmarTexto}>SIM, EXCLUIR</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setModalExcluir(false)} style={styles.btnCancelar}>
               <Text style={styles.btnCancelarTexto}>Cancelar</Text>
@@ -1003,7 +1037,7 @@ export default function Medicamentos() {
         </View>
       </Modal>
 
-      {/* Modal pausar — roxo */}
+      {/* Modal pausar */}
       <Modal visible={modalPausar} transparent animationType="fade">
         <View style={styles.modalCentroFundo}>
           <View style={styles.modalCentroCard}>
@@ -1039,9 +1073,12 @@ export default function Medicamentos() {
   )
 }
 
+// ─── Styles — cópia exata do exames.tsx ──────────────────────────────────────
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F5F0FF' },
 
+  // Header
   cardPerfil: {
     backgroundColor: '#fff', marginHorizontal: 16, marginTop: 16,
     borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10,
@@ -1060,6 +1097,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
 
+  // Título
   cardTituloLista: {
     marginHorizontal: 16, marginTop: 12, borderRadius: 50,
     paddingVertical: 14, alignItems: 'center',
@@ -1068,33 +1106,40 @@ const styles = StyleSheet.create({
   },
   cardTituloTexto: { fontSize: 14, fontWeight: '800', color: '#fff', letterSpacing: 3 },
 
-  botoesAcao: {
-    marginHorizontal: 16, marginTop: 10,
-    flexDirection: 'row', justifyContent: 'space-between',
+  // Filtros — cópia exata do exames
+  filtrosRow: {
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: 16, marginTop: 12, gap: 8,
   },
-  btnAcaoSecundario: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    borderWidth: 1.5, borderColor: '#481D94', borderRadius: 50,
-    paddingHorizontal: 16, paddingVertical: 10,
-    backgroundColor: 'rgba(107,73,173,0.08)',
+  chip: {
+    flex: 1, borderRadius: 999, overflow: 'hidden',
+    borderWidth: 1.5, borderColor: '#6B49AD',
   },
-  btnAcaoSecundarioTexto: { fontSize: 13, fontWeight: '700', color: '#481D94' },
-  btnAcaoPrimario: {
-    borderRadius: 50,
+  chipAtivo: {
+    borderColor: 'transparent',
     shadowColor: '#481D94', shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3, shadowRadius: 8, elevation: 5,
+    shadowOpacity: 0.25, shadowRadius: 6, elevation: 4,
   },
-  btnAcaoPrimarioGradient: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    borderRadius: 50, paddingHorizontal: 18, paddingVertical: 10,
-  },
-  btnAcaoPrimarioTexto: { fontSize: 13, fontWeight: '700', color: '#fff' },
+  chipGradient: { paddingVertical: 10, alignItems: 'center' },
+  chipInner: { paddingVertical: 10, alignItems: 'center', backgroundColor: 'rgba(107,73,173,0.08)' },
+  chipTexto: { fontSize: 12, fontWeight: '700', color: '#481D94' },
+  chipTextoAtivo: { fontSize: 12, fontWeight: '700', color: '#fff' },
 
+  // FAB
+  fab: {
+    position: 'absolute', bottom: 28, right: 24,
+    borderRadius: 999,
+    shadowColor: '#481D94', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35, shadowRadius: 10, elevation: 8,
+  },
+  fabGradient: { width: 60, height: 60, borderRadius: 999, justifyContent: 'center', alignItems: 'center' },
+
+  // Lista
   cardLista: {
     marginHorizontal: 16, marginTop: 14, backgroundColor: '#fff',
     borderRadius: 24, padding: 16,
     shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08, shadowRadius: 12, elevation: 4, gap: 14,
+    shadowOpacity: 0.08, shadowRadius: 12, elevation: 4, gap: 12,
   },
   vazioContainer: { alignItems: 'center', paddingVertical: 40, gap: 10 },
   vazioIcone: {
@@ -1104,23 +1149,48 @@ const styles = StyleSheet.create({
   vazioTitulo: { fontSize: 17, fontWeight: '700', color: '#301971' },
   vazioSub: { fontSize: 14, color: '#9163CB' },
 
-  card: { backgroundColor: '#FAFAFE', borderRadius: 20, padding: 18, borderWidth: 1, borderColor: '#EDE8FA' },
-  cardTopo: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  cardIconeBox: { width: 48, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  cardTextos: { flex: 1, gap: 6 },
-  cardNome: { fontSize: 17, fontWeight: '800', color: '#301971' },
-  tagStatus: { alignSelf: 'flex-start', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4 },
-  tagStatusTexto: { fontSize: 12, fontWeight: '700' },
+  // Card — cópia exata do exames
+  card: {
+    backgroundColor: '#FAFAFE', borderRadius: 18, padding: 16,
+    borderWidth: 1, borderColor: '#EDE8FA',
+  },
+  cardTopo: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  cardIconeBox: { width: 46, height: 46, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  cardTextos: { flex: 1, gap: 4 },
+  cardNome: { fontSize: 16, fontWeight: '700', color: '#301971' },
+  cardSubtitulo: { fontSize: 13, color: '#6B49AD', fontWeight: '600' },
   cardAcoes: { flexDirection: 'row', gap: 8 },
-  btnEditar: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#F0EAFF', justifyContent: 'center', alignItems: 'center' },
-  btnExcluirCard: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#FFF1F2', justifyContent: 'center', alignItems: 'center' },
-  cardDivisor: { height: 1, backgroundColor: '#EDE8FA', marginVertical: 14 },
-  cardInfos: { gap: 10 },
-  infoLinha: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  infoLinhaLabel: { fontSize: 13, fontWeight: '700', color: '#9163CB', width: 72 },
-  infoLinhaTexto: { fontSize: 14, fontWeight: '600', color: '#301971', flexShrink: 1 },
-  infoLinhaDestaque: { backgroundColor: '#EDE8FA', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 },
+  btnEditar: {
+    width: 38, height: 38, borderRadius: 12,
+    backgroundColor: '#F0EAFF', justifyContent: 'center', alignItems: 'center',
+  },
+  btnExcluirCard: {
+    width: 38, height: 38, borderRadius: 12,
+    backgroundColor: '#FFF1F2', justifyContent: 'center', alignItems: 'center',
+  },
+  cardDivisor: { height: 1, backgroundColor: '#F0EAFF', marginVertical: 12 },
+  cardInfos: { gap: 8 },
+  cardDetalhes: { gap: 10 },
 
+  infoLinha: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  infoLinhaLabel: { fontSize: 13, fontWeight: '700', color: '#9163CB', flexShrink: 0, marginRight: 4 },
+  infoLinhaTexto: { fontSize: 13, color: '#301971', fontWeight: '600', flex: 1 },
+
+  badgeStatus: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4,
+  },
+  badgeStatusTexto: { fontSize: 11, fontWeight: '700' },
+
+  // Ver mais — cópia exata do exames (com linha divisória acima)
+  verMaisBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 4, marginTop: 10, paddingTop: 10,
+    borderTopWidth: 1, borderTopColor: '#F0EAFF',
+  },
+  verMaisTexto: { fontSize: 13, fontWeight: '700', color: '#6B49AD' },
+
+  // Modal form
   modalFundo: { flex: 1 },
   modalOverlay: { flex: 1, backgroundColor: '#00000055' },
   modalCard: {
@@ -1134,10 +1204,9 @@ const styles = StyleSheet.create({
   duasColunas: { flexDirection: 'row', gap: 12 },
   coluna: { flex: 1 },
 
-  campoWrapper: { marginBottom: 20 },
+  campoWrapper: { marginBottom: 18 },
   campoLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   campoLabel: { fontSize: 11, fontWeight: '700', color: '#9163CB', letterSpacing: 1.2 },
-
   tagOpcional: {
     backgroundColor: '#EDE8FA', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3,
     borderWidth: 1, borderColor: '#C4B5FD',
@@ -1149,40 +1218,26 @@ const styles = StyleSheet.create({
     fontSize: 15, color: '#301971', backgroundColor: '#FAFAFE',
   },
   inputErro: { borderColor: '#f87171', backgroundColor: '#FFF5F5' },
+  dicaTexto: { fontSize: 12, color: '#9163CB', marginTop: 6, marginLeft: 4 },
+  erroRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6, marginLeft: 4 },
+  erroTexto: { fontSize: 12, color: '#dc2626', fontWeight: '600' },
+
+  botaoSalvarWrapper: {
+    marginTop: 8, shadowColor: '#481D94',
+    shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
+  },
+  botaoSalvar: { borderRadius: 50, paddingVertical: 18, alignItems: 'center' },
+  botaoSalvarTexto: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 2 },
+
+  // Horários
+  horarioRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   horarioInputWrapper: {
     flex: 1, flexDirection: 'row', alignItems: 'center',
     borderWidth: 1.5, borderColor: '#481D94', borderRadius: 50,
     backgroundColor: '#FAFAFE', paddingHorizontal: 16,
   },
   horarioInputErro: { borderColor: '#f87171', backgroundColor: '#FFF5F5' },
-  horarioIcoe: { marginRight: 8 },
   inputHorario: { flex: 1, paddingVertical: Platform.OS === 'ios' ? 14 : 11, fontSize: 15, color: '#301971' },
-  dicaTexto: { fontSize: 12, color: '#9163CB', marginTop: 6, marginLeft: 4 },
-  erroRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6, marginLeft: 4 },
-  erroTexto: { fontSize: 12, color: '#dc2626', fontWeight: '600' },
-
-  avisoBox: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
-    backgroundColor: '#F0EAFF', borderRadius: 14, padding: 12,
-    marginBottom: 14, borderLeftWidth: 3, borderLeftColor: '#481D94',
-  },
-  avisoTexto: { flex: 1, fontSize: 13, color: '#481D94', lineHeight: 18, fontWeight: '500' },
-
-  statusBox: {
-    backgroundColor: '#EDE8FA', borderRadius: 18, padding: 18,
-    marginBottom: 20, borderWidth: 1.5, borderColor: '#C4B5FD',
-  },
-  statusBoxHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  statusBoxTitulo: { fontSize: 14, fontWeight: '700', color: '#481D94' },
-  statusBoxSub: { fontSize: 13, color: '#6B49AD', marginBottom: 14, lineHeight: 18 },
-  statusBoxInput: {
-    borderWidth: 1.5, borderColor: '#481D94', borderRadius: 18,
-    paddingHorizontal: 16, paddingVertical: 14,
-    fontSize: 15, color: '#301971', backgroundColor: '#fff',
-    textAlignVertical: 'top', minHeight: 80,
-  },
-
-  horarioRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   btnRemoverHorario: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFF1F2', justifyContent: 'center', alignItems: 'center' },
   btnAdicionarHorario: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
@@ -1191,6 +1246,13 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: '#C4B5FD', marginTop: 4,
   },
   btnAdicionarTexto: { fontSize: 13, fontWeight: '700', color: '#6B49AD' },
+
+  avisoBox: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+    backgroundColor: '#F0EAFF', borderRadius: 14, padding: 12,
+    marginBottom: 14, borderLeftWidth: 3, borderLeftColor: '#481D94',
+  },
+  avisoTexto: { flex: 1, fontSize: 13, color: '#481D94', lineHeight: 18, fontWeight: '500' },
 
   diasRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   diaPilula: {
@@ -1221,13 +1283,41 @@ const styles = StyleSheet.create({
   seletorTexto: { fontSize: 13, fontWeight: '600', color: '#9163CB' },
   seletorTextoAtivo: { color: '#301971', fontWeight: '800' },
 
-  botaoSalvarWrapper: {
-    marginTop: 8, shadowColor: '#481D94',
-    shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
+  statusBox: {
+    backgroundColor: '#EDE8FA', borderRadius: 18, padding: 18,
+    marginBottom: 20, borderWidth: 1.5, borderColor: '#C4B5FD',
   },
-  botaoSalvar: { borderRadius: 50, paddingVertical: 18, alignItems: 'center' },
-  botaoSalvarTexto: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 2 },
+  statusBoxHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  statusBoxTitulo: { fontSize: 14, fontWeight: '700', color: '#481D94' },
+  statusBoxSub: { fontSize: 13, color: '#6B49AD', marginBottom: 14, lineHeight: 18 },
+  statusBoxInput: {
+    borderWidth: 1.5, borderColor: '#481D94', borderRadius: 18,
+    paddingHorizontal: 16, paddingVertical: 14,
+    fontSize: 15, color: '#301971', backgroundColor: '#fff',
+    textAlignVertical: 'top', minHeight: 80,
+  },
 
+  // Modal excluir
+  modalExcluirFundo: { flex: 1, backgroundColor: '#00000066', justifyContent: 'flex-end' },
+  modalExcluirCard: {
+    backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    padding: 32, alignItems: 'center', gap: 12,
+  },
+  modalExcluirIcone: {
+    width: 72, height: 72, borderRadius: 24, backgroundColor: '#FFF1F2',
+    justifyContent: 'center', alignItems: 'center', marginBottom: 8,
+  },
+  modalExcluirTitulo: { fontSize: 20, fontWeight: '800', color: '#301971' },
+  modalExcluirMsg: { fontSize: 15, color: '#6B49AD', marginBottom: 8 },
+  btnExcluirConfirmar: {
+    width: '100%', backgroundColor: '#dc2626',
+    borderRadius: 50, paddingVertical: 18, alignItems: 'center',
+  },
+  btnExcluirConfirmarTexto: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 2 },
+  btnCancelar: { paddingVertical: 14 },
+  btnCancelarTexto: { fontSize: 15, fontWeight: '600', color: '#9163CB' },
+
+  // Modal pausar
   modalCentroFundo: {
     flex: 1, backgroundColor: '#00000066', justifyContent: 'center',
     alignItems: 'center', paddingHorizontal: 28,
@@ -1237,14 +1327,6 @@ const styles = StyleSheet.create({
     shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.2, shadowRadius: 20, elevation: 12,
   },
-  modalExcluirIcone: {
-    width: 72, height: 72, borderRadius: 24, backgroundColor: '#FFF1F2',
-    justifyContent: 'center', alignItems: 'center', alignSelf: 'center', marginTop: 28, marginBottom: 4,
-  },
-  modalCentroTitulo: { fontSize: 20, fontWeight: '800', color: '#301971', textAlign: 'center', paddingHorizontal: 24 },
-  modalCentroMsg: { fontSize: 15, color: '#6B49AD', textAlign: 'center', paddingHorizontal: 24, marginTop: 8, marginBottom: 8 },
-  btnExcluirConfirmar: { marginHorizontal: 24, marginTop: 8, backgroundColor: '#dc2626', borderRadius: 50, paddingVertical: 16, alignItems: 'center' },
-
   modalRoxoHeader: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingHorizontal: 24, paddingVertical: 20,
@@ -1252,18 +1334,10 @@ const styles = StyleSheet.create({
   modalRoxoTitulo: { fontSize: 17, fontWeight: '800', color: '#fff' },
   modalRoxoBody: { padding: 24 },
   modalRoxoPergunta: { fontSize: 15, fontWeight: '600', color: '#301971', marginBottom: 16, lineHeight: 22 },
-  modalRoxoInput: {
-    borderWidth: 1.5, borderColor: '#481D94', borderRadius: 18,
-    paddingHorizontal: 16, paddingVertical: 14,
-    fontSize: 15, color: '#301971', backgroundColor: '#FAFAFE',
-    textAlignVertical: 'top', minHeight: 80, marginBottom: 20,
-  },
   btnRoxoConfirmar: {
     shadowColor: '#481D94', shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
   },
   btnRoxoGradient: { borderRadius: 50, paddingVertical: 16, alignItems: 'center' },
   btnConfirmarTexto: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 2 },
-  btnCancelar: { paddingVertical: 14, alignItems: 'center' },
-  btnCancelarTexto: { fontSize: 15, fontWeight: '600', color: '#9163CB' },
 })

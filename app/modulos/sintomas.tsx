@@ -9,8 +9,8 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import ModalAlerta from '../../src/components/ModalAlerta'
-import { supabase } from '../../src/lib/supabase'
 import { salvarHistorico } from '../../src/lib/events'
+import { supabase } from '../../src/lib/supabase'
 
 const { height } = Dimensions.get('window')
 
@@ -24,6 +24,8 @@ type Sintoma = {
     gatilho: string | null
     observacoes: string | null
 }
+
+type Filtro = 'todos' | 'hoje' | 'semana'
 
 const PAIN_SCALE = [
     { valor: 0, emoji: '😌', label: 'Sem dor', roxo: '#F3EEFF' },
@@ -64,6 +66,24 @@ function mascaraHorario(texto: string): string {
     return n.length <= 2 ? n : `${n.slice(0, 2)}:${n.slice(2)}`
 }
 
+function filtrarPorPeriodo(lista: Sintoma[], filtro: Filtro): Sintoma[] {
+    if (filtro === 'todos') return lista
+    const agora = new Date()
+    agora.setHours(0, 0, 0, 0)
+    return lista.filter((sint) => {
+        if (!sint.data) return false
+        const dataSint = new Date(sint.data)
+        dataSint.setHours(0, 0, 0, 0)
+        if (filtro === 'hoje') return dataSint.getTime() === agora.getTime()
+        if (filtro === 'semana') {
+            const seteDias = new Date(agora)
+            seteDias.setDate(agora.getDate() - 6)
+            return dataSint >= seteDias && dataSint <= agora
+        }
+        return true
+    })
+}
+
 function Campo({
     label, value, onChangeText, placeholder, keyboardType = 'default' as any,
     opcional = false, dica, erro, erroTexto,
@@ -93,7 +113,7 @@ function Campo({
                 value={value}
                 onChangeText={onChangeText}
                 placeholder={placeholder}
-                placeholderTextColor="#C4B5FD"
+                placeholderTextColor="#9163CB"
                 keyboardType={keyboardType}
                 autoCorrect={false}
             />
@@ -110,7 +130,6 @@ function Campo({
 
 function PainScale({ value, onChange }: { value: number, onChange: (v: number) => void }) {
     const atual = PAIN_SCALE[value]
-    const textoNumero = value <= 3 ? '#481D94' : '#fff'
 
     return (
         <View style={styles.campoWrapper}>
@@ -118,14 +137,12 @@ function PainScale({ value, onChange }: { value: number, onChange: (v: number) =
                 <Text style={styles.campoLabel}>INTENSIDADE DA DOR</Text>
             </View>
 
-            {/* Centro */}
             <View style={[styles.painCentro, { backgroundColor: atual.roxo }]}>
                 <Text style={styles.painEmoji}>{atual.emoji}</Text>
                 <Text style={[styles.painValor, { color: value <= 3 ? '#481D94' : '#fff' }]}>{value}/10</Text>
                 <Text style={[styles.painLabel, { color: value <= 3 ? '#6B49AD' : '#E2D9F3' }]}>{atual.label}</Text>
             </View>
 
-            {/* Números */}
             <View style={styles.painNumeros}>
                 {PAIN_SCALE.map((item) => (
                     <TouchableOpacity
@@ -158,6 +175,7 @@ export default function Sintomas() {
     const [usuarioId, setUsuarioId] = useState<string | null>(null)
     const [lista, setLista] = useState<Sintoma[]>([])
     const [perfilFoto, setPerfilFoto] = useState<string | null>(null)
+    const [filtro, setFiltro] = useState<Filtro>('todos')
 
     const [modalVisivel, setModalVisivel] = useState(false)
     const [editando, setEditando] = useState<Sintoma | null>(null)
@@ -294,22 +312,27 @@ export default function Sintomas() {
     }
 
     function confirmarExcluir(id: number) { setExcluirId(id); setModalExcluir(true) }
+
     async function excluir() {
         if (!excluirId) return
         const sint = lista.find(s => s.id === excluirId)
         const { error } = await supabase.from('sintomas').delete().eq('id', excluirId)
         if (error) { setModalAlerta({ visivel: true, titulo: 'Erro ao excluir', mensagem: error.message }); return }
-        if (sint) {
-            await salvarHistorico(usuarioId!, `Sintoma ${sint.nome} foi removido`)
-        }
+        if (sint) await salvarHistorico(usuarioId!, `Sintoma ${sint.nome} foi removido`)
         setModalExcluir(false); setExcluirId(null)
         await buscar()
     }
 
+    const filtroLabels: Record<Filtro, string> = { todos: 'Todos', hoje: 'Hoje', semana: 'Semana' }
+    const listaFiltrada = filtrarPorPeriodo(lista, filtro)
+
+    // ─── Render ───────────────────────────────────────────────────────────────
+
     return (
         <SafeAreaView style={styles.safe} edges={['top']}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
 
+                {/* Header */}
                 <View style={styles.cardPerfil}>
                     <TouchableOpacity onPress={() => router.push('/modulos/perfil' as any)} activeOpacity={0.85}>
                         {perfilFoto ? (
@@ -326,6 +349,7 @@ export default function Sintomas() {
                     </TouchableOpacity>
                 </View>
 
+                {/* Título */}
                 <LinearGradient
                     colors={['#6B49AD', '#6843B1', '#481D94']}
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
@@ -334,36 +358,45 @@ export default function Sintomas() {
                     <Text style={styles.cardTituloTexto}>SINTOMAS</Text>
                 </LinearGradient>
 
-                <View style={styles.botoesAcao}>
-                    <TouchableOpacity
-                        onPress={() => router.push({ pathname: '/modulos/historico', params: { modulo: 'sintoma' } } as any)}
-                        activeOpacity={0.85}
-                        style={styles.btnAcaoSecundario}
-                    >
-                        <Feather name="clock" size={16} color="#6B49AD" />
-                        <Text style={styles.btnAcaoSecundarioTexto}>Histórico</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity onPress={() => abrirModal()} activeOpacity={0.85} style={styles.btnAcaoPrimario}>
-                        <LinearGradient
-                            colors={['#6B49AD', '#481D94']}
-                            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                            style={styles.btnAcaoPrimarioGradient}
+                {/* Filtros — estilo chips do medicamentos */}
+                <View style={styles.filtrosRow}>
+                    {(['todos', 'hoje', 'semana'] as Filtro[]).map((f) => (
+                        <TouchableOpacity
+                            key={f}
+                            onPress={() => setFiltro(f)}
+                            activeOpacity={0.8}
+                            style={[styles.chip, filtro === f && styles.chipAtivo]}
                         >
-                            <Feather name="plus" size={16} color="#fff" />
-                            <Text style={styles.btnAcaoPrimarioTexto}>Cadastrar</Text>
-                        </LinearGradient>
-                    </TouchableOpacity>
+                            {filtro === f ? (
+                                <LinearGradient
+                                    colors={['#6B49AD', '#481D94']}
+                                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                                    style={styles.chipGradient}
+                                >
+                                    <Text style={styles.chipTextoAtivo}>{filtroLabels[f]}</Text>
+                                </LinearGradient>
+                            ) : (
+                                <View style={styles.chipInner}>
+                                    <Text style={styles.chipTexto}>{filtroLabels[f]}</Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
+                    ))}
                 </View>
 
+                {/* Lista */}
                 <View style={styles.cardLista}>
-                    {lista.length === 0 ? (
+                    {listaFiltrada.length === 0 ? (
                         <View style={styles.vazioContainer}>
                             <View style={styles.vazioIcone}>
                                 <Feather name="thermometer" size={36} color="#9163CB" />
                             </View>
-                            <Text style={styles.vazioTitulo}>Nenhum sintoma</Text>
-                            <Text style={styles.vazioSub}>Toque em "Cadastrar" para adicionar</Text>
+                            <Text style={styles.vazioTitulo}>
+                                {filtro === 'hoje' ? 'Nenhum sintoma hoje'
+                                    : filtro === 'semana' ? 'Nenhum sintoma esta semana'
+                                        : 'Nenhum sintoma'}
+                            </Text>
+                            <Text style={styles.vazioSub}>Toque em "+" para adicionar</Text>
                         </View>
                     ) : (
                         lista.map((sint) => {
@@ -439,6 +472,18 @@ export default function Sintomas() {
                 </View>
             </ScrollView>
 
+            {/* FAB */}
+            <TouchableOpacity onPress={() => abrirModal()} activeOpacity={0.85} style={styles.fab}>
+                <LinearGradient
+                    colors={['#6B49AD', '#481D94']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={styles.fabGradient}
+                >
+                    <Feather name="plus" size={26} color="#fff" />
+                </LinearGradient>
+            </TouchableOpacity>
+
+            {/* Modal cadastro/edição */}
             <Modal visible={modalVisivel} transparent animationType="none">
                 <KeyboardAvoidingView style={styles.modalFundo} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
                     <TouchableOpacity style={styles.modalOverlay} onPress={fecharModal} activeOpacity={1} />
@@ -483,7 +528,7 @@ export default function Sintomas() {
 
                             <TouchableOpacity onPress={salvar} disabled={carregando} activeOpacity={0.85} style={styles.botaoSalvarWrapper}>
                                 <LinearGradient
-                                    colors={['#6B49AD', '#6843B1', '#481D94']}
+                                    colors={['#6B49AD', '#481D94']}
                                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                                     style={[styles.botaoSalvar, carregando && { opacity: 0.6 }]}
                                 >
@@ -498,16 +543,17 @@ export default function Sintomas() {
                 </KeyboardAvoidingView>
             </Modal>
 
+            {/* Modal excluir */}
             <Modal visible={modalExcluir} transparent animationType="fade">
-                <View style={styles.modalCentroFundo}>
-                    <View style={styles.modalCentroCard}>
+                <View style={styles.modalExcluirFundo}>
+                    <View style={styles.modalExcluirCard}>
                         <View style={styles.modalExcluirIcone}>
                             <Feather name="trash-2" size={32} color="#dc2626" />
                         </View>
-                        <Text style={styles.modalCentroTitulo}>Excluir sintoma?</Text>
-                        <Text style={styles.modalCentroMsg}>Esta ação não pode ser desfeita.</Text>
+                        <Text style={styles.modalExcluirTitulo}>Excluir sintoma?</Text>
+                        <Text style={styles.modalExcluirMsg}>Esta ação não pode ser desfeita.</Text>
                         <TouchableOpacity onPress={excluir} activeOpacity={0.85} style={styles.btnExcluirConfirmar}>
-                            <Text style={styles.btnConfirmarTexto}>SIM, EXCLUIR</Text>
+                            <Text style={styles.btnExcluirConfirmarTexto}>SIM, EXCLUIR</Text>
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => setModalExcluir(false)} style={styles.btnCancelar}>
                             <Text style={styles.btnCancelarTexto}>Cancelar</Text>
@@ -524,9 +570,12 @@ export default function Sintomas() {
     )
 }
 
+// ─── Styles — espelho exato do medicamentos.tsx ───────────────────────────────
+
 const styles = StyleSheet.create({
     safe: { flex: 1, backgroundColor: '#F5F0FF' },
 
+    // Header
     cardPerfil: {
         backgroundColor: '#fff', marginHorizontal: 16, marginTop: 16,
         borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10,
@@ -545,6 +594,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center', alignItems: 'center',
     },
 
+    // Título
     cardTituloLista: {
         marginHorizontal: 16, marginTop: 12, borderRadius: 50,
         paddingVertical: 14, alignItems: 'center',
@@ -553,33 +603,40 @@ const styles = StyleSheet.create({
     },
     cardTituloTexto: { fontSize: 14, fontWeight: '800', color: '#fff', letterSpacing: 3 },
 
-    botoesAcao: {
-        marginHorizontal: 16, marginTop: 10,
-        flexDirection: 'row', justifyContent: 'space-between',
+    // Filtros — chips do medicamentos
+    filtrosRow: {
+        flexDirection: 'row', alignItems: 'center',
+        marginHorizontal: 16, marginTop: 12, gap: 8,
     },
-    btnAcaoSecundario: {
-        flexDirection: 'row', alignItems: 'center', gap: 6,
-        borderWidth: 1.5, borderColor: '#481D94', borderRadius: 50,
-        paddingHorizontal: 16, paddingVertical: 10,
-        backgroundColor: 'rgba(107,73,173,0.08)',
+    chip: {
+        flex: 1, borderRadius: 999, overflow: 'hidden',
+        borderWidth: 1.5, borderColor: '#6B49AD',
     },
-    btnAcaoSecundarioTexto: { fontSize: 13, fontWeight: '700', color: '#481D94' },
-    btnAcaoPrimario: {
-        borderRadius: 50,
+    chipAtivo: {
+        borderColor: 'transparent',
         shadowColor: '#481D94', shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.3, shadowRadius: 8, elevation: 5,
+        shadowOpacity: 0.25, shadowRadius: 6, elevation: 4,
     },
-    btnAcaoPrimarioGradient: {
-        flexDirection: 'row', alignItems: 'center', gap: 6,
-        borderRadius: 50, paddingHorizontal: 18, paddingVertical: 10,
-    },
-    btnAcaoPrimarioTexto: { fontSize: 13, fontWeight: '700', color: '#fff' },
+    chipGradient: { paddingVertical: 10, alignItems: 'center' },
+    chipInner: { paddingVertical: 10, alignItems: 'center', backgroundColor: 'rgba(107,73,173,0.08)' },
+    chipTexto: { fontSize: 12, fontWeight: '700', color: '#481D94' },
+    chipTextoAtivo: { fontSize: 12, fontWeight: '700', color: '#fff' },
 
+    // FAB
+    fab: {
+        position: 'absolute', bottom: 28, right: 24,
+        borderRadius: 999,
+        shadowColor: '#481D94', shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.35, shadowRadius: 10, elevation: 8,
+    },
+    fabGradient: { width: 60, height: 60, borderRadius: 999, justifyContent: 'center', alignItems: 'center' },
+
+    // Lista
     cardLista: {
         marginHorizontal: 16, marginTop: 14, backgroundColor: '#fff',
         borderRadius: 24, padding: 16,
         shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.08, shadowRadius: 12, elevation: 4, gap: 14,
+        shadowOpacity: 0.08, shadowRadius: 12, elevation: 4, gap: 12,
     },
     vazioContainer: { alignItems: 'center', paddingVertical: 40, gap: 10 },
     vazioIcone: {
@@ -589,22 +646,33 @@ const styles = StyleSheet.create({
     vazioTitulo: { fontSize: 17, fontWeight: '700', color: '#301971' },
     vazioSub: { fontSize: 14, color: '#9163CB' },
 
-    card: { backgroundColor: '#FAFAFE', borderRadius: 20, padding: 18, borderWidth: 1, borderColor: '#EDE8FA' },
-    cardTopo: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-    cardIconeBox: { width: 48, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-    cardEmoji: { fontSize: 26 },
-    cardTextos: { flex: 1, gap: 6 },
-    cardNome: { fontSize: 17, fontWeight: '800', color: '#301971' },
-    tagIntensidade: { alignSelf: 'flex-start', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4 },
+    // Card — espelho do medicamentos
+    card: {
+        backgroundColor: '#FAFAFE', borderRadius: 18, padding: 16,
+        borderWidth: 1, borderColor: '#EDE8FA',
+    },
+    cardTopo: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    cardIconeBox: { width: 46, height: 46, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+    cardEmoji: { fontSize: 24 },
+    cardTextos: { flex: 1, gap: 4 },
+    cardNome: { fontSize: 16, fontWeight: '700', color: '#301971' },
+    tagIntensidade: { alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
     tagIntensidadeTexto: { fontSize: 12, fontWeight: '700' },
     cardAcoes: { flexDirection: 'row', gap: 8 },
-    btnEditar: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#F0EAFF', justifyContent: 'center', alignItems: 'center' },
-    btnExcluirCard: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#FFF1F2', justifyContent: 'center', alignItems: 'center' },
-    cardDivisor: { height: 1, backgroundColor: '#EDE8FA', marginVertical: 14 },
-    cardInfos: { gap: 10 },
-    infoLinha: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    infoLinhaLabel: { fontSize: 13, fontWeight: '700', color: '#9163CB', width: 72 },
-    infoLinhaTexto: { fontSize: 14, fontWeight: '600', color: '#301971', flexShrink: 1 },
+    btnEditar: {
+        width: 38, height: 38, borderRadius: 12,
+        backgroundColor: '#F0EAFF', justifyContent: 'center', alignItems: 'center',
+    },
+    btnExcluirCard: {
+        width: 38, height: 38, borderRadius: 12,
+        backgroundColor: '#FFF1F2', justifyContent: 'center', alignItems: 'center',
+    },
+    cardDivisor: { height: 1, backgroundColor: '#F0EAFF', marginVertical: 12 },
+    cardInfos: { gap: 8 },
+
+    infoLinha: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    infoLinhaLabel: { fontSize: 13, fontWeight: '700', color: '#9163CB', flexShrink: 0, marginRight: 4 },
+    infoLinhaTexto: { fontSize: 13, color: '#301971', fontWeight: '600', flex: 1 },
 
     // Pain Scale
     painCentro: {
@@ -629,6 +697,7 @@ const styles = StyleSheet.create({
         marginTop: 12, fontStyle: 'italic',
     },
 
+    // Modal form
     modalFundo: { flex: 1 },
     modalOverlay: { flex: 1, backgroundColor: '#00000055' },
     modalCard: {
@@ -642,10 +711,9 @@ const styles = StyleSheet.create({
     duasColunas: { flexDirection: 'row', gap: 12 },
     coluna: { flex: 1 },
 
-    campoWrapper: { marginBottom: 20 },
+    campoWrapper: { marginBottom: 18 },
     campoLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
     campoLabel: { fontSize: 11, fontWeight: '700', color: '#9163CB', letterSpacing: 1.2 },
-
     tagOpcional: {
         backgroundColor: '#EDE8FA', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3,
         borderWidth: 1, borderColor: '#C4B5FD',
@@ -668,23 +736,23 @@ const styles = StyleSheet.create({
     botaoSalvar: { borderRadius: 50, paddingVertical: 18, alignItems: 'center' },
     botaoSalvarTexto: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 2 },
 
-    modalCentroFundo: {
-        flex: 1, backgroundColor: '#00000066', justifyContent: 'center',
-        alignItems: 'center', paddingHorizontal: 28,
-    },
-    modalCentroCard: {
-        backgroundColor: '#fff', borderRadius: 28, width: '100%', overflow: 'hidden',
-        shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.2, shadowRadius: 20, elevation: 12,
+    // Modal excluir — bottom sheet (igual ao medicamentos)
+    modalExcluirFundo: { flex: 1, backgroundColor: '#00000066', justifyContent: 'flex-end' },
+    modalExcluirCard: {
+        backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28,
+        padding: 32, alignItems: 'center', gap: 12,
     },
     modalExcluirIcone: {
         width: 72, height: 72, borderRadius: 24, backgroundColor: '#FFF1F2',
-        justifyContent: 'center', alignItems: 'center', alignSelf: 'center', marginTop: 28, marginBottom: 4,
+        justifyContent: 'center', alignItems: 'center', marginBottom: 8,
     },
-    modalCentroTitulo: { fontSize: 20, fontWeight: '800', color: '#301971', textAlign: 'center', paddingHorizontal: 24 },
-    modalCentroMsg: { fontSize: 15, color: '#6B49AD', textAlign: 'center', paddingHorizontal: 24, marginTop: 8, marginBottom: 8 },
-    btnExcluirConfirmar: { marginHorizontal: 24, marginTop: 8, backgroundColor: '#dc2626', borderRadius: 50, paddingVertical: 16, alignItems: 'center' },
-    btnConfirmarTexto: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 2 },
-    btnCancelar: { paddingVertical: 14, alignItems: 'center' },
+    modalExcluirTitulo: { fontSize: 20, fontWeight: '800', color: '#301971' },
+    modalExcluirMsg: { fontSize: 15, color: '#6B49AD', marginBottom: 8 },
+    btnExcluirConfirmar: {
+        width: '100%', backgroundColor: '#dc2626',
+        borderRadius: 50, paddingVertical: 18, alignItems: 'center',
+    },
+    btnExcluirConfirmarTexto: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 2 },
+    btnCancelar: { paddingVertical: 14 },
     btnCancelarTexto: { fontSize: 15, fontWeight: '600', color: '#9163CB' },
 })
