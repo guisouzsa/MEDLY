@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "app-idosos",
-    "slug": "app-idosos",
+    "name": "medly",
+    "slug": "medly",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
