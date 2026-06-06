@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { router, useFocusEffect } from 'expo-router'
 import { useCallback, useEffect, useState } from 'react'
 import {
-  Dimensions, Image, Modal, Platform,
+  Image, Modal, Platform,
   ScrollView, StatusBar, StyleSheet, Text,
   TouchableOpacity, View,
 } from 'react-native'
@@ -11,22 +11,18 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { getEventsForDate, getProximoLembrete } from '../../src/lib/events'
 import { supabase } from '../../src/lib/supabase'
 
-const { width } = Dimensions.get('window')
-
-// Calendário: largura total - paddingHorizontal do scroll (16*2) - padding do card (16*2)
-const CALENDAR_WIDTH = width - 32 - 32
-const DIA_SIZE = Math.floor(CALENDAR_WIDTH / 7)
-
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
+// ─── "Remédios" substituiu "Medicamentos" ────────────────────────────────────
 const ACOES_LINHA1 = [
-  { label: 'Medicamentos', icone: 'activity', rota: '/modulos/medicamentos' },
+  { label: 'Remédios', icone: 'activity', rota: '/modulos/medicamentos' },
   { label: 'Consultas', icone: 'calendar', rota: '/modulos/consultas' },
   { label: 'Sintomas', icone: 'thermometer', rota: '/modulos/sintomas' },
   { label: 'Exames', icone: 'file-text', rota: '/modulos/exames' },
 ]
 
+// ─── Calendário: igual ao da tela de calendário (semanas row a row) ──────────
 function getDiasDoMes(ano: number, mes: number) {
   const primeiroDia = new Date(ano, mes, 1).getDay()
   const totalDias = new Date(ano, mes + 1, 0).getDate()
@@ -34,6 +30,12 @@ function getDiasDoMes(ano: number, mes: number) {
   for (let d = 1; d <= totalDias; d++) celulas.push(d)
   while (celulas.length % 7 !== 0) celulas.push(null)
   return celulas
+}
+
+function getSemanas(dias: (number | null)[]): (number | null)[][] {
+  const semanas: (number | null)[][] = []
+  for (let i = 0; i < dias.length; i += 7) semanas.push(dias.slice(i, i + 7))
+  return semanas
 }
 
 function getHora() {
@@ -46,17 +48,20 @@ function getData() {
   return `${a.getDate()} de ${MESES[a.getMonth()]}`
 }
 
+// ─── Calendário responsivo (sem flexWrap, semanas em linhas) ─────────────────
 function Calendario({ data }: { data: any }) {
   const hoje = new Date()
   const [mes, setMes] = useState(hoje.getMonth())
   const [ano, setAno] = useState(hoje.getFullYear())
   const dias = getDiasDoMes(ano, mes)
+  const semanas = getSemanas(dias)
 
   function anterior() { mes === 0 ? (setMes(11), setAno(a => a - 1)) : setMes(m => m - 1) }
   function proximo() { mes === 11 ? (setMes(0), setAno(a => a + 1)) : setMes(m => m + 1) }
 
   return (
     <View style={styles.calendarioCard}>
+      {/* Nav */}
       <View style={styles.calendarioNav}>
         <TouchableOpacity onPress={anterior} style={styles.navBtn}>
           <Feather name="chevron-left" size={20} color="#6B49AD" />
@@ -64,11 +69,9 @@ function Calendario({ data }: { data: any }) {
         <View style={styles.seletorMesAno}>
           <View style={styles.seletorBox}>
             <Text style={styles.seletorTexto}>{MESES[mes]}</Text>
-            <Feather name="chevron-down" size={14} color="#6B49AD" />
           </View>
           <View style={styles.seletorBox}>
             <Text style={styles.seletorTexto}>{ano}</Text>
-            <Feather name="chevron-down" size={14} color="#6B49AD" />
           </View>
         </View>
         <TouchableOpacity onPress={proximo} style={styles.navBtn}>
@@ -76,49 +79,50 @@ function Calendario({ data }: { data: any }) {
         </TouchableOpacity>
       </View>
 
-      {/* Cabeçalho dias da semana */}
+      {/* Dias da semana */}
       <View style={styles.semanaRow}>
         {DIAS_SEMANA.map(d => (
-          <View key={d} style={styles.semanaCell}>
-            <Text style={styles.semanaTexto}>{d}</Text>
-          </View>
+          <Text key={d} style={styles.semanaTexto}>{d}</Text>
         ))}
       </View>
 
-      {/* Grade de dias */}
+      {/* Grade — uma View por semana, cada célula com flex:1 */}
       <View style={styles.grade}>
-        {dias.map((dia, i) => {
-          const isHoje = dia === hoje.getDate() && mes === hoje.getMonth() && ano === hoje.getFullYear()
-          let temEvento = false
-          if (dia !== null) {
-            const dayStr = `${ano}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
-            const evs = getEventsForDate(dayStr, data)
-            temEvento = evs.length > 0
-          }
-          return (
-            <View key={i} style={styles.diaCell}>
-              {dia !== null ? (
-                <TouchableOpacity
-                  style={[
-                    styles.diaBotao,
-                    isHoje && styles.diaHoje,
-                    temEvento && styles.diaComEvento,
-                  ]}
-                  onPress={() => router.push({ pathname: '/(tabs)/calendario', params: { dia, mes, ano } })}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[
-                    styles.diaTexto,
-                    isHoje && styles.diaHojeTexto,
-                    temEvento && styles.diaComEventoTexto,
-                  ]}>
-                    {dia}
-                  </Text>
-                </TouchableOpacity>
-              ) : <View style={styles.diaBotao} />}
-            </View>
-          )
-        })}
+        {semanas.map((semana, si) => (
+          <View key={si} style={styles.semanaLinha}>
+            {semana.map((dia, di) => {
+              const isHoje = dia === hoje.getDate() && mes === hoje.getMonth() && ano === hoje.getFullYear()
+              let temEvento = false
+              if (dia !== null) {
+                const dayStr = `${ano}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
+                temEvento = getEventsForDate(dayStr, data).length > 0
+              }
+              return (
+                <View key={di} style={styles.diaCell}>
+                  {dia !== null ? (
+                    <TouchableOpacity
+                      style={[
+                        styles.diaBotao,
+                        isHoje && styles.diaHoje,
+                        temEvento && styles.diaComEvento,
+                      ]}
+                      onPress={() => router.push({ pathname: '/(tabs)/calendario', params: { dia, mes, ano } })}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[
+                        styles.diaTexto,
+                        isHoje && styles.diaHojeTexto,
+                        temEvento && styles.diaComEventoTexto,
+                      ]}>
+                        {dia}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : <View style={styles.diaBotao} />}
+                </View>
+              )
+            })}
+          </View>
+        ))}
       </View>
 
       {/* Legenda */}
@@ -137,7 +141,7 @@ function Calendario({ data }: { data: any }) {
   )
 }
 
-function ModalSair({ visivel, onCancelar, onConfirmar }: { visivel: boolean, onCancelar: () => void, onConfirmar: () => void }) {
+function ModalSair({ visivel, onCancelar, onConfirmar }: { visivel: boolean; onCancelar: () => void; onConfirmar: () => void }) {
   return (
     <Modal visible={visivel} transparent animationType="fade">
       <View style={styles.modalFundo}>
@@ -162,6 +166,7 @@ function ModalSair({ visivel, onCancelar, onConfirmar }: { visivel: boolean, onC
   )
 }
 
+// ─── Ações rápidas: responsivo com flexWrap e largura controlada ──────────────
 function LinhaAcoes({ acoes }: { acoes: typeof ACOES_LINHA1 }) {
   return (
     <View style={styles.acoesLinha}>
@@ -177,9 +182,9 @@ function LinhaAcoes({ acoes }: { acoes: typeof ACOES_LINHA1 }) {
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={styles.acaoIconeBox}
           >
-            <Feather name={acao.icone as any} size={30} color="#fff" />
+            <Feather name={acao.icone as any} size={26} color="#fff" />
           </LinearGradient>
-          <Text style={styles.acaoLabel}>{acao.label}</Text>
+          <Text style={styles.acaoLabel} numberOfLines={2}>{acao.label}</Text>
         </TouchableOpacity>
       ))}
     </View>
@@ -192,10 +197,7 @@ export default function Dashboard() {
   const [fotoUri, setFotoUri] = useState<string | null>(null)
   const [modalSair, setModalSair] = useState(false)
   const [dbData, setDbData] = useState<{
-    medicamentos: any[]
-    consultas: any[]
-    exames: any[]
-    sintomas: any[]
+    medicamentos: any[]; consultas: any[]; exames: any[]; sintomas: any[]
   }>({ medicamentos: [], consultas: [], exames: [], sintomas: [] })
   const [proximoLembrete, setProximoLembrete] = useState<{ tipo: string; descricao: string } | null>(null)
 
@@ -211,10 +213,7 @@ export default function Dashboard() {
         if (!user) return
 
         const { data: perfil } = await supabase
-          .from('perfis')
-          .select('foto_url, nome')
-          .eq('id', user.id)
-          .single()
+          .from('perfis').select('foto_url, nome').eq('id', user.id).single()
         if (perfil) {
           setNome(perfil.nome ?? '')
           if (perfil.foto_url) {
@@ -232,17 +231,14 @@ export default function Dashboard() {
             supabase.from('exames').select('*').eq('usuario_id', user.id),
             supabase.from('sintomas').select('*').eq('usuario_id', user.id),
           ])
-
           const payload = {
             medicamentos: medsRes.data || [],
             consultas: consRes.data || [],
             exames: exasRes.data || [],
             sintomas: sintsRes.data || [],
           }
-
           setDbData(payload)
-          const prox = getProximoLembrete(payload)
-          setProximoLembrete(prox)
+          setProximoLembrete(getProximoLembrete(payload))
         } catch (err) {
           console.error('Erro ao carregar dados do Dashboard:', err)
         }
@@ -265,27 +261,16 @@ export default function Dashboard() {
       >
         {/* CARD 1 — header */}
         <View style={styles.card1}>
-          <TouchableOpacity
-            onPress={() => router.push('/modulos/perfil' as any)}
-            activeOpacity={0.85}
-          >
+          <TouchableOpacity onPress={() => router.push('/modulos/perfil' as any)} activeOpacity={0.85}>
             {fotoUri ? (
-              <Image
-                source={{ uri: fotoUri }}
-                style={styles.fotoPerfil}
-                onError={() => setFotoUri(null)}
-              />
+              <Image source={{ uri: fotoUri }} style={styles.fotoPerfil} onError={() => setFotoUri(null)} />
             ) : (
               <View style={styles.fotoPerfilPlaceholder}>
                 <Feather name="user" size={22} color="#6B49AD" />
               </View>
             )}
           </TouchableOpacity>
-          <Image
-            source={require('../../assets/images/logo.png')}
-            style={styles.logoHeader}
-            resizeMode="contain"
-          />
+          <Image source={require('../../assets/images/logo.png')} style={styles.logoHeader} resizeMode="contain" />
         </View>
 
         {/* CARD 2 — saudação */}
@@ -304,22 +289,33 @@ export default function Dashboard() {
           </View>
         </LinearGradient>
 
-        {/* CARD 3 — próximo lembrete */}
+        {/* CARD 3 — próximo lembrete
+            card3Fora = borda externa (padding pequeno, border radius maior)
+            card3Inner = conteúdo interno com overflow:hidden
+            Imagem: alinhada ao fim, sem margem, "vazando" pelas bordas de baixo e lateral direita
+        */}
         <View style={styles.card3Fora}>
           <LinearGradient
             colors={['#E7DDFF', '#A780FF']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={styles.card3Inner}
           >
+            {/* Texto centralizado verticalmente, sem centralizar a foto */}
             <View style={styles.card3Esquerda}>
               <Text style={styles.card3Label}>PRÓXIMO LEMBRETE</Text>
-              <Text style={styles.card3Tipo}>{proximoLembrete ? proximoLembrete.tipo : 'Tudo em dia!'}</Text>
-              <Text style={styles.card3Desc}>{proximoLembrete ? proximoLembrete.descricao : 'Nenhum lembrete para os próximos 30 dias.'}</Text>
+              <Text style={styles.card3Tipo}>
+                {proximoLembrete ? proximoLembrete.tipo : 'Tudo em dia!'}
+              </Text>
+              <Text style={styles.card3Desc}>
+                {proximoLembrete ? proximoLembrete.descricao : 'Nenhum lembrete para os próximos 30 dias.'}
+              </Text>
             </View>
+            {/* Imagem encosta nas bordas: marginBottom e marginRight negativos
+                para ultrapassar o padding e sumir as bordas de baixo e direita */}
             <Image
               source={require('../../assets/images/foto-card-lembrete.png')}
               style={styles.card3Img}
-              resizeMode="contain"
+              resizeMode="cover"
             />
           </LinearGradient>
         </View>
@@ -333,12 +329,8 @@ export default function Dashboard() {
         {/* CARD 5 — calendário */}
         <Calendario data={dbData} />
 
-        {/* botão sair */}
-        <TouchableOpacity
-          style={styles.botaoSair}
-          onPress={() => setModalSair(true)}
-          activeOpacity={0.8}
-        >
+        {/* Botão sair */}
+        <TouchableOpacity style={styles.botaoSair} onPress={() => setModalSair(true)} activeOpacity={0.8}>
           <Feather name="log-out" size={18} color="#6B49AD" />
           <Text style={styles.botaoSairTexto}>Sair da conta</Text>
         </TouchableOpacity>
@@ -346,11 +338,7 @@ export default function Dashboard() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      <ModalSair
-        visivel={modalSair}
-        onCancelar={() => setModalSair(false)}
-        onConfirmar={sair}
-      />
+      <ModalSair visivel={modalSair} onCancelar={() => setModalSair(false)} onConfirmar={sair} />
     </SafeAreaView>
   )
 }
@@ -364,44 +352,26 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingTop: 12 },
 
-  // Header
+  // ── Header ──────────────────────────────────────────────────────────────────
   card1: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#fff',
-    borderRadius: 60,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#fff', borderRadius: 60, paddingHorizontal: 12, paddingVertical: 8,
     marginBottom: 12,
-    shadowColor: '#6B49AD',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 6,
   },
   fotoPerfil: { width: 48, height: 48, borderRadius: 24 },
   fotoPerfilPlaceholder: {
     width: 48, height: 48, borderRadius: 24,
-    backgroundColor: '#EDE8FA',
-    justifyContent: 'center', alignItems: 'center',
+    backgroundColor: '#EDE8FA', justifyContent: 'center', alignItems: 'center',
   },
   logoHeader: { width: 100, height: 36 },
 
-  // Saudação
+  // ── Saudação ─────────────────────────────────────────────────────────────────
   card2: {
-    borderRadius: 24,
-    paddingHorizontal: 24,
-    paddingVertical: 28,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    borderRadius: 24, paddingHorizontal: 24, paddingVertical: 28,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     marginBottom: 12,
-    shadowColor: '#301971',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 14,
-    elevation: 10,
+    shadowColor: '#301971', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 14, elevation: 10,
   },
   card2Esquerda: { flex: 1 },
   card2Ola: { color: '#D6B9FF', fontSize: 14, fontWeight: '600', marginBottom: 6 },
@@ -410,77 +380,73 @@ const styles = StyleSheet.create({
   card2Data: { color: '#C9A8FF', fontSize: 13, fontWeight: '600', marginBottom: 4 },
   card2Hora: { color: '#fff', fontSize: 42, fontWeight: '800', lineHeight: 46 },
 
-  // Lembrete — imagem encosta no segundo card (card3Fora)
+  // ── Lembrete ─────────────────────────────────────────────────────────────────
+  // card3Fora: borda externa fina (padding=5), radius ligeiramente maior que o inner
   card3Fora: {
     backgroundColor: '#EDE8FA',
-    borderRadius: 24,
+    borderRadius: 26,
     padding: 6,
     marginBottom: 12,
   },
+  // card3Inner: conteúdo; overflow:hidden garante que a imagem "vaze" por dentro
   card3Inner: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    borderRadius: 20,
+    alignItems: 'stretch',          // estica ambos os filhos até a mesma altura
+    borderRadius: 22,
     overflow: 'hidden',
     paddingLeft: 20,
-    minHeight: 120,
+    minHeight: 130,
   },
+  // Texto ocupa o espaço livre e fica centralizado verticalmente
   card3Esquerda: {
     flex: 1,
     justifyContent: 'center',
     paddingVertical: 20,
+    paddingRight: 8,
   },
   card3Label: { fontSize: 10, fontWeight: '700', color: '#6B49AD', letterSpacing: 1, marginBottom: 8 },
   card3Tipo: { fontSize: 16, fontWeight: '700', color: '#301971', marginBottom: 4 },
-  card3Desc: { fontSize: 14, fontWeight: '600', color: '#301971' },
-  // marginRight: 0 + alignItems: flex-end faz a imagem encostar no card externo
-  card3Img: { width: 120, height: 120, marginRight: 0, marginBottom: 0 },
-
-  // Ações rápidas
-  acoesCard: {
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    padding: 20,
-    marginBottom: 12,
-    shadowColor: '#6B49AD',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
+  card3Desc: { fontSize: 13, fontWeight: '600', color: '#301971', lineHeight: 18 },
+  // Imagem: largura e altura fixas; margens negativas fazem sumir bordas de baixo e direita
+  card3Img: {
+    width: 130,
+    height: 150,
+    marginBottom: -5,   // vai além da borda inferior do card3Inner
+    marginRight: -5,    // vai além da borda direita do card3Inner
+    alignSelf: 'flex-end',
   },
-  acoesTitle: { fontSize: 15, fontWeight: '700', color: '#301971', marginBottom: 18 },
+
+  // ── Ações rápidas ────────────────────────────────────────────────────────────
+  acoesCard: {
+    backgroundColor: '#fff', borderRadius: 24, padding: 20, marginBottom: 12,
+    shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 4,
+  },
+  acoesTitle: { fontSize: 15, fontWeight: '700', color: '#301971', marginBottom: 16 },
+  // flex: 1 em cada botão + row = divide igualmente sem quebrar
   acoesLinha: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 16,
-    marginBottom: 16,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
-  acaoBotao: { alignItems: 'center', width: 80 },
+  acaoBotao: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
   acaoIconeBox: {
-    width: 72, height: 72, borderRadius: 22,
+    width: 60, height: 60, borderRadius: 18,
     justifyContent: 'center', alignItems: 'center',
-    marginBottom: 10,
-    shadowColor: '#481D94',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 8,
+    marginBottom: 8,
+    shadowColor: '#481D94', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
   },
-  acaoLabel: { fontSize: 12, fontWeight: '700', color: '#301971', textAlign: 'center' },
+  acaoLabel: { fontSize: 11, fontWeight: '700', color: '#301971', textAlign: 'center' },
 
-  // Calendário — responsivo, todos os dias aparecem incluindo sábado
+  // ── Calendário (idêntico ao da tela de calendário) ───────────────────────────
   calendarioCard: {
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    padding: 16,
-    marginBottom: 12,
+    backgroundColor: '#fff', borderRadius: 24, padding: 16, marginBottom: 12,
   },
   calendarioNav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16,
   },
   navBtn: { padding: 4 },
   seletorMesAno: { flexDirection: 'row', gap: 8 },
@@ -491,23 +457,16 @@ const styles = StyleSheet.create({
   },
   seletorTexto: { fontSize: 13, fontWeight: '700', color: '#301971' },
 
-  // Semana: célula de largura fixa igual ao DIA_SIZE
   semanaRow: { flexDirection: 'row', marginBottom: 8 },
-  semanaCell: { width: DIA_SIZE, alignItems: 'center' },
-  semanaTexto: { fontSize: 11, fontWeight: '700', color: '#9163CB' },
+  semanaTexto: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '700', color: '#9163CB' },
 
-  // Grade: cada célula tem largura fixa DIA_SIZE
-  grade: { flexDirection: 'row', flexWrap: 'wrap' },
-  diaCell: { width: DIA_SIZE, alignItems: 'center', marginBottom: 4 },
-  diaBotao: {
-    width: DIA_SIZE - 4,
-    height: DIA_SIZE - 4,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  // Grade sem flexWrap: uma linha por semana
+  grade: { flexDirection: 'column' },
+  semanaLinha: { flexDirection: 'row', marginBottom: 4 },
+  diaCell: { flex: 1, alignItems: 'center' },
+  diaBotao: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   diaHoje: { borderWidth: 1.5, borderColor: '#6B49AD' },
-  diaTexto: { fontSize: 12, color: '#301971', fontWeight: '500' },
+  diaTexto: { fontSize: 13, color: '#301971', fontWeight: '500' },
   diaHojeTexto: { color: '#6B49AD', fontWeight: '700' },
   diaComEvento: { backgroundColor: '#EDE8FA' },
   diaComEventoTexto: { color: '#6B49AD', fontWeight: '700' },
@@ -518,50 +477,28 @@ const styles = StyleSheet.create({
   legendaQuadrado: { width: 14, height: 14, borderRadius: 4 },
   legendaTexto: { fontSize: 10, color: '#9163CB', fontWeight: '600' },
 
-  // Botão sair
+  // ── Botão sair ───────────────────────────────────────────────────────────────
   botaoSair: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    borderWidth: 1.5,
-    borderColor: '#6B49AD',
-    borderRadius: 60,
-    paddingVertical: 16,
-    marginBottom: 12,
-    backgroundColor: '#fff',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+    borderWidth: 1.5, borderColor: '#6B49AD', borderRadius: 60,
+    paddingVertical: 16, marginBottom: 12, backgroundColor: '#fff',
   },
   botaoSairTexto: { fontSize: 15, fontWeight: '700', color: '#6B49AD' },
 
-  // Modal
+  // ── Modal ────────────────────────────────────────────────────────────────────
   modalFundo: {
-    flex: 1,
-    backgroundColor: '#00000066',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
+    flex: 1, backgroundColor: '#00000066',
+    justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32,
   },
   modalCard: {
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    padding: 28,
-    width: '100%',
-    alignItems: 'center',
-    shadowColor: '#6B49AD',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 12,
+    backgroundColor: '#fff', borderRadius: 24, padding: 28, width: '100%', alignItems: 'center',
+    shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 12,
   },
   modalTitulo: { fontSize: 18, fontWeight: '800', color: '#301971', marginBottom: 10, letterSpacing: 0.5 },
   modalMensagem: { fontSize: 15, color: '#6B49AD', textAlign: 'center', marginBottom: 24, lineHeight: 22 },
   modalBotaoWrapper: {
     width: '100%',
-    shadowColor: '#301971',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowColor: '#301971', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
     marginBottom: 12,
   },
   modalBotao: { borderRadius: 60, paddingVertical: 14, alignItems: 'center' },
