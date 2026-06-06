@@ -1,5 +1,7 @@
 import { Feather } from '@expo/vector-icons'
+import * as FileSystem from 'expo-file-system/legacy'
 import * as ImagePicker from 'expo-image-picker'
+import { decode } from 'base64-arraybuffer'
 import { LinearGradient } from 'expo-linear-gradient'
 import { router } from 'expo-router'
 import { useEffect, useState } from 'react'
@@ -14,6 +16,8 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Alert,
+  Modal,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import ModalAlerta from '../../src/components/ModalAlerta'
@@ -31,6 +35,7 @@ export default function Perfil() {
   const [carregando, setCarregando] = useState(false)
   const [carregandoDados, setCarregandoDados] = useState(true)
   const [modal, setModal] = useState({ visivel: false, titulo: '', mensagem: '' })
+  const [modalDeletarVisivel, setModalDeletarVisivel] = useState(false)
 
   function mostrarModal(titulo: string, mensagem: string) {
     setModal({ visivel: true, titulo, mensagem })
@@ -130,14 +135,30 @@ export default function Perfil() {
         }
         // 2. Se uma nova foto local foi selecionada
         else if (fotoUri.startsWith('file://') || fotoUri.startsWith('ph://') || fotoUri.startsWith('content://') || Platform.OS === 'web') {
-          const response = await fetch(fotoUri)
-          const blob = await response.blob()
-          const ext = blob.type.split('/')[1] ?? 'jpg'
-          const fileName = `${usuarioId}.${ext}`
+          let fileName = ''
+          let uploadData: any
+          let contentType = 'image/jpeg'
+
+          if (Platform.OS === 'web') {
+            const response = await fetch(fotoUri)
+            const blob = await response.blob()
+            const ext = blob.type.split('/')[1] ?? 'jpg'
+            fileName = `${usuarioId}.${ext}`
+            uploadData = blob
+            contentType = blob.type
+          } else {
+            const parts = fotoUri.split('.')
+            const extRaw = parts.length > 1 ? parts.pop()?.toLowerCase() : 'jpg'
+            const ext = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extRaw || '') ? extRaw : 'jpg'
+            fileName = `${usuarioId}.${ext}`
+            const base64 = await FileSystem.readAsStringAsync(fotoUri, { encoding: FileSystem.EncodingType.Base64 })
+            uploadData = decode(base64)
+            contentType = `image/${ext === 'jpg' ? 'jpeg' : ext}`
+          }
 
           const { data: upload, error: uploadError } = await supabase.storage
             .from('avatares')
-            .upload(fileName, blob, { contentType: blob.type, upsert: true })
+            .upload(fileName, uploadData, { contentType, upsert: true })
 
           if (uploadError) {
             throw new Error(`Upload da foto falhou: ${uploadError.message}`)
@@ -147,17 +168,6 @@ export default function Perfil() {
             const { data: urlData } = supabase.storage.from('avatares').getPublicUrl(fileName)
             finalFotoUrl = `${urlData.publicUrl}?t=${Date.now()}`
           }
-        }
-      }
-
-      // Atualizar Supabase Auth se o email mudou
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user && user.email !== email.trim()) {
-        const { error: authError } = await supabase.auth.updateUser({
-          email: email.trim(),
-        })
-        if (authError) {
-          throw new Error(`Erro ao atualizar e-mail de acesso: ${authError.message}`)
         }
       }
 
@@ -182,6 +192,36 @@ export default function Perfil() {
       console.log('Erro ao salvar perfil:', error)
       mostrarModal('Erro ao salvar', error.message || 'Ocorreu um erro ao atualizar suas informações.')
     } finally {
+      setCarregando(false)
+    }
+  }
+
+  function confirmarDeletarConta() {
+    setModalDeletarVisivel(true)
+  }
+
+  async function deletarConta() {
+    if (!usuarioId) return
+    setCarregando(true)
+    setModalDeletarVisivel(false)
+    try {
+      // 1. Apaga do banco (se não houver RPC de exclusão total configurada, no mínimo os dados são apagados)
+      const { error: dbError } = await supabase.from('perfis').delete().eq('id', usuarioId)
+      if (dbError) throw dbError
+
+      // 2. Tenta chamar uma RPC se existir (padrão em alguns setups)
+      try {
+        await supabase.rpc('delete_user')
+      } catch (rpcErr) {
+        console.log('Erro ao chamar RPC delete_user:', rpcErr)
+      }
+
+      // 3. Desloga e envia para a tela inicial
+      await supabase.auth.signOut()
+      router.replace('/auth')
+    } catch (error: any) {
+      console.log('Erro ao deletar conta:', error)
+      mostrarModal('Erro', 'Não foi possível deletar a conta. Tente novamente.')
       setCarregando(false)
     }
   }
@@ -249,15 +289,13 @@ export default function Perfil() {
                 <View style={styles.campoWrapper}>
                   <Text style={styles.campoLabel}>E-MAIL DE ACESSO</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { backgroundColor: '#EDE8FA', color: '#9163CB' }]}
                     value={email}
-                    onChangeText={setEmail}
+                    editable={false}
                     placeholder="Seu e-mail"
                     placeholderTextColor="#C4B5FD"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
                   />
+                  <Text style={{ fontSize: 11, color: '#9163CB', marginTop: 4 }}>* Por questões de segurança, a troca de e-mail deve ser feita através do suporte.</Text>
                 </View>
 
                 <TouchableOpacity
@@ -277,6 +315,15 @@ export default function Perfil() {
                     </Text>
                   </LinearGradient>
                 </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={confirmarDeletarConta}
+                  activeOpacity={0.85}
+                  style={styles.botaoDeletarWrapper}
+                  disabled={carregando}
+                >
+                  <Text style={styles.botaoDeletarTexto}>DELETAR CONTA</Text>
+                </TouchableOpacity>
               </View>
             </View>
           )}
@@ -289,6 +336,26 @@ export default function Perfil() {
         mensagem={modal.mensagem}
         onFechar={() => setModal(m => ({ ...m, visivel: false }))}
       />
+
+      <Modal visible={modalDeletarVisivel} transparent animationType="fade">
+        <View style={styles.modalFundoDeletar}>
+          <View style={styles.modalDeletarCard}>
+            <View style={styles.modalDeletarIcone}>
+              <Feather name="alert-triangle" size={32} color="#dc2626" />
+            </View>
+            <Text style={styles.modalDeletarTitulo}>Deletar Conta?</Text>
+            <Text style={styles.modalDeletarMsg}>
+              Tem certeza que deseja deletar sua conta? Todos os seus dados serão apagados permanentemente e essa ação não pode ser desfeita.
+            </Text>
+            <TouchableOpacity onPress={deletarConta} activeOpacity={0.85} style={styles.btnDeletarConfirmar}>
+              <Text style={styles.btnDeletarConfirmarTexto}>SIM, DELETAR CONTA</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setModalDeletarVisivel(false)} style={styles.btnDeletarCancelar}>
+              <Text style={styles.btnDeletarCancelarTexto}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   )
 }
@@ -435,5 +502,89 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     letterSpacing: 2,
+  },
+  botaoDeletarWrapper: {
+    marginTop: 20,
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  botaoDeletarTexto: {
+    color: '#dc2626',
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  modalFundoDeletar: {
+    flex: 1,
+    backgroundColor: '#00000055',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    alignItems: 'center',
+  },
+  modalDeletarCard: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 340,
+    shadowColor: '#6B49AD',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  modalDeletarIcone: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FFEBEE',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalDeletarTitulo: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#301971',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  modalDeletarMsg: {
+    fontSize: 14,
+    color: '#9163CB',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  btnDeletarConfirmar: {
+    backgroundColor: '#dc2626',
+    borderRadius: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    marginBottom: 10,
+    shadowColor: '#dc2626',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  btnDeletarConfirmarTexto: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  btnDeletarCancelar: {
+    paddingVertical: 12,
+    width: '100%',
+    alignItems: 'center',
+  },
+  btnDeletarCancelarTexto: {
+    color: '#6B49AD',
+    fontSize: 14,
+    fontWeight: '700',
   },
 })
