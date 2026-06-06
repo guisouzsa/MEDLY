@@ -3,7 +3,6 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { router } from 'expo-router'
 import { useState } from 'react'
 import {
-    Alert,
     Dimensions,
     Image,
     KeyboardAvoidingView,
@@ -16,6 +15,7 @@ import {
     View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import ModalAlerta from '../../src/components/ModalAlerta'
 import { supabase } from '../../src/lib/supabase'
 
 const { width } = Dimensions.get('window')
@@ -24,17 +24,17 @@ const CARD_W = Math.min(width * 0.88, 420)
 function Campo({
   label, value, onChangeText, placeholder,
   secureTextEntry = false, keyboardType = 'default' as any,
-  icone, mostrarOlho = false,
+  icone, mostrarOlho = false, erro = false,
 }: {
   label: string, value: string, onChangeText: (t: string) => void,
   placeholder?: string, secureTextEntry?: boolean, keyboardType?: any,
-  icone: any, mostrarOlho?: boolean,
+  icone: any, mostrarOlho?: boolean, erro?: boolean,
 }) {
   const [visivel, setVisivel] = useState(false)
   return (
     <View style={styles.campoWrapper}>
       <Text style={styles.campoLabel}>{label}</Text>
-      <View style={styles.campoRow}>
+      <View style={[styles.campoRow, erro && styles.campoRowErro]}>
         <Image source={icone} style={styles.icone} resizeMode="contain" />
         <TextInput
           style={styles.input}
@@ -61,10 +61,18 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
   const [carregando, setCarregando] = useState(false)
+  const [erros, setErros] = useState({ email: false, senha: false })
+  const [modal, setModal] = useState({ visivel: false, titulo: '', mensagem: '' })
 
   async function handleLogin() {
-    if (!email.trim() || !senha.trim()) {
-      Alert.alert('Atenção', 'Preencha todos os campos.')
+    let temErro = false
+    const novosErros = { email: false, senha: false }
+    if (!email.trim()) { novosErros.email = true; temErro = true }
+    if (!senha.trim()) { novosErros.senha = true; temErro = true }
+    setErros(novosErros)
+
+    if (temErro) {
+      setModal({ visivel: true, titulo: 'Atenção', mensagem: 'Preencha todos os campos.' })
       return
     }
     setCarregando(true)
@@ -77,7 +85,7 @@ export default function Login() {
     setCarregando(false)
 
     if (error) {
-      Alert.alert('Erro', 'E-mail ou senha incorretos.')
+      setModal({ visivel: true, titulo: 'Erro', mensagem: 'E-mail ou senha incorretos.' })
       return
     }
 
@@ -106,14 +114,24 @@ export default function Login() {
 
           <View style={[styles.card, { width: CARD_W }]}>
             <Campo
-              label="EMAIL" value={email} onChangeText={setEmail}
-              placeholder="seu@email.com" keyboardType="email-address"
+              label="E-MAIL"
+              value={email}
+              onChangeText={(t) => { setEmail(t); setErros(e => ({ ...e, email: false })) }}
+              placeholder="seu@email.com"
+              keyboardType="email-address"
               icone={require('../../assets/images/icone-email.png')}
+              erro={erros.email}
             />
+
             <Campo
-              label="SENHA" value={senha} onChangeText={setSenha}
-              placeholder="Sua senha" secureTextEntry mostrarOlho
+              label="SENHA"
+              value={senha}
+              onChangeText={(t) => { setSenha(t); setErros(e => ({ ...e, senha: false })) }}
+              placeholder="Sua senha secreta"
+              secureTextEntry
+              mostrarOlho
               icone={require('../../assets/images/icone-senha.png')}
+              erro={erros.senha}
             />
           </View>
 
@@ -141,6 +159,12 @@ export default function Login() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+      <ModalAlerta
+        visivel={modal.visivel}
+        titulo={modal.titulo}
+        mensagem={modal.mensagem}
+        onFechar={() => setModal(m => ({ ...m, visivel: false }))}
+      />
     </SafeAreaView>
   )
 }
@@ -168,9 +192,16 @@ const styles = StyleSheet.create({
   campoWrapper: { marginBottom: 16 },
   campoLabel: { fontSize: 11, fontWeight: '700', color: '#301971', letterSpacing: 1.2, marginBottom: 7, marginLeft: 4 },
   campoRow: {
-    flexDirection: 'row', alignItems: 'center',
-    borderWidth: 1.5, borderColor: '#6B49AD', borderRadius: 60,
-    paddingHorizontal: 18, paddingVertical: Platform.OS === 'ios' ? 14 : 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#6B49AD',
+    borderRadius: 60,
+    paddingHorizontal: 18,
+    paddingVertical: Platform.OS === 'ios' ? 14 : 10,
+  },
+  campoRowErro: {
+    borderColor: '#e53e3e',
   },
   icone: { width: 20, height: 20, marginRight: 12 },
   input: { flex: 1, fontSize: 15, color: '#301971', paddingVertical: 0 },

@@ -8,6 +8,7 @@ import {
     Text, TextInput, TouchableOpacity, View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import ModalAlerta from '../../src/components/ModalAlerta'
 import { useCadastro } from '../../src/context/CadastroContext'
 
 const { width } = Dimensions.get('window')
@@ -48,7 +49,8 @@ function Campo({
 export default function Cadastro() {
   const { dados, setNome, setEmail, setSenha, setErroEmail } = useCadastro()
   const [confirmar, setConfirmar] = useState('')
-  const [erros, setErros] = useState({ nome: '', email: '', senha: '' })
+  const [erros, setErros] = useState({ nome: '', email: '', senha: '', confirmar: '' })
+  const [modal, setModal] = useState({ visivel: false, titulo: '', mensagem: '' })
 
   useEffect(() => {
     if (dados.erroEmail) {
@@ -59,12 +61,15 @@ export default function Cadastro() {
 
   function avancar() {
     const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dados.email)
-    const novosErros = { nome: '', email: '', senha: '' }
+    const novosErros = { nome: '', email: '', senha: '', confirmar: '' }
     let temErro = false
     if (dados.nome.trim().length < 2) { novosErros.nome = 'Digite seu nome completo'; temErro = true }
     if (!emailValido) { novosErros.email = 'Digite um e-mail válido'; temErro = true }
-    if (dados.senha.length < 6) { novosErros.senha = 'Mínimo 6 caracteres'; temErro = true }
-    if (dados.senha !== confirmar) { novosErros.senha = 'As senhas não são iguais'; temErro = true }
+    if (!dados.senha) { novosErros.senha = 'Digite uma senha'; temErro = true }
+    else if (dados.senha.length < 6) { novosErros.senha = 'Mínimo 6 caracteres'; temErro = true }
+    if (!confirmar) { novosErros.confirmar = 'Confirme sua senha'; temErro = true }
+    else if (dados.senha !== confirmar) { novosErros.confirmar = 'As senhas não são iguais'; temErro = true }
+    
     setErros(novosErros)
     if (temErro) return
     router.push('/auth/cadastro-foto' as any)
@@ -94,11 +99,11 @@ export default function Cadastro() {
               icone={require('../../assets/images/icone-email.png')} />
             <Campo label="SENHA" value={dados.senha}
               onChangeText={(t) => { setSenha(t); setErros(e => ({ ...e, senha: '' })) }}
-              placeholder="Mínimo 6 caracteres" secureTextEntry mostrarOlho
+              placeholder="Mínimo 6 caracteres" secureTextEntry mostrarOlho erro={erros.senha}
               icone={require('../../assets/images/icone-senha.png')} />
             <Campo label="CONFIRME SUA SENHA" value={confirmar}
-              onChangeText={(t) => { setConfirmar(t); setErros(e => ({ ...e, senha: '' })) }}
-              placeholder="Repita sua senha" secureTextEntry mostrarOlho erro={erros.senha}
+              onChangeText={(t) => { setConfirmar(t); setErros(e => ({ ...e, confirmar: '' })) }}
+              placeholder="Repita sua senha" secureTextEntry mostrarOlho erro={erros.confirmar}
               icone={require('../../assets/images/icone-senha.png')} />
           </View>
 
@@ -118,6 +123,13 @@ export default function Cadastro() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <ModalAlerta 
+        visivel={modal.visivel} 
+        titulo={modal.titulo} 
+        mensagem={modal.mensagem} 
+        onFechar={() => setModal(m => ({ ...m, visivel: false }))} 
+      />
     </SafeAreaView>
   )
 }

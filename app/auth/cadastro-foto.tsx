@@ -1,5 +1,7 @@
 import { Feather } from '@expo/vector-icons'
+import * as FileSystem from 'expo-file-system/legacy'
 import * as ImagePicker from 'expo-image-picker'
+import { decode } from 'base64-arraybuffer'
 import { LinearGradient } from 'expo-linear-gradient'
 import { router } from 'expo-router'
 import { useState } from 'react'
@@ -82,12 +84,29 @@ export default function CadastroFoto() {
 
     if (dados.fotoUri && !pularFoto) {
       try {
-        const response = await fetch(dados.fotoUri)
-        const blob = await response.blob()
-        const ext = blob.type.split('/')[1] ?? 'jpg'
-        const fileName = `${user.id}.${ext}`
+        let fileName = ''
+        let uploadData: any
+        let contentType = 'image/jpeg'
+
+        if (Platform.OS === 'web') {
+          const response = await fetch(dados.fotoUri)
+          const blob = await response.blob()
+          const ext = blob.type.split('/')[1] ?? 'jpg'
+          fileName = `${user.id}.${ext}`
+          uploadData = blob
+          contentType = blob.type
+        } else {
+          const parts = dados.fotoUri.split('.')
+          const extRaw = parts.length > 1 ? parts.pop()?.toLowerCase() : 'jpg'
+          const ext = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extRaw || '') ? extRaw : 'jpg'
+          fileName = `${user.id}.${ext}`
+          const base64 = await FileSystem.readAsStringAsync(dados.fotoUri, { encoding: FileSystem.EncodingType.Base64 })
+          uploadData = decode(base64)
+          contentType = `image/${ext === 'jpg' ? 'jpeg' : ext}`
+        }
+
         const { data: upload, error: uploadError } = await supabase.storage.from('avatares')
-          .upload(fileName, blob, { contentType: blob.type, upsert: true })
+          .upload(fileName, uploadData, { contentType, upsert: true })
 
         if (upload) {
           const { data: urlData } = supabase.storage.from('avatares').getPublicUrl(fileName)
