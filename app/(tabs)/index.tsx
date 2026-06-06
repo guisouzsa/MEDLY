@@ -12,8 +12,13 @@ import { getEventsForDate, getProximoLembrete } from '../../src/lib/events'
 import { supabase } from '../../src/lib/supabase'
 
 const { width } = Dimensions.get('window')
+
+// Calendário: largura total - paddingHorizontal do scroll (16*2) - padding do card (16*2)
+const CALENDAR_WIDTH = width - 32 - 32
+const DIA_SIZE = Math.floor(CALENDAR_WIDTH / 7)
+
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
-const DIAS_SEMANA = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
+const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
 const ACOES_LINHA1 = [
   { label: 'Medicamentos', icone: 'activity', rota: '/modulos/medicamentos' },
@@ -70,9 +75,17 @@ function Calendario({ data }: { data: any }) {
           <Feather name="chevron-right" size={20} color="#6B49AD" />
         </TouchableOpacity>
       </View>
+
+      {/* Cabeçalho dias da semana */}
       <View style={styles.semanaRow}>
-        {DIAS_SEMANA.map(d => <Text key={d} style={styles.semanaTexto}>{d}</Text>)}
+        {DIAS_SEMANA.map(d => (
+          <View key={d} style={styles.semanaCell}>
+            <Text style={styles.semanaTexto}>{d}</Text>
+          </View>
+        ))}
       </View>
+
+      {/* Grade de dias */}
       <View style={styles.grade}>
         {dias.map((dia, i) => {
           const isHoje = dia === hoje.getDate() && mes === hoje.getMonth() && ano === hoje.getFullYear()
@@ -89,14 +102,15 @@ function Calendario({ data }: { data: any }) {
                   style={[
                     styles.diaBotao,
                     isHoje && styles.diaHoje,
-                    temEvento && styles.diaComEvento
+                    temEvento && styles.diaComEvento,
                   ]}
                   onPress={() => router.push({ pathname: '/(tabs)/calendario', params: { dia, mes, ano } })}
+                  activeOpacity={0.7}
                 >
                   <Text style={[
                     styles.diaTexto,
                     isHoje && styles.diaHojeTexto,
-                    temEvento && styles.diaComEventoTexto
+                    temEvento && styles.diaComEventoTexto,
                   ]}>
                     {dia}
                   </Text>
@@ -105,6 +119,19 @@ function Calendario({ data }: { data: any }) {
             </View>
           )
         })}
+      </View>
+
+      {/* Legenda */}
+      <View style={styles.legendaDivisor} />
+      <View style={styles.legendaRow}>
+        <View style={styles.legendaItem}>
+          <View style={[styles.legendaQuadrado, { borderWidth: 1.5, borderColor: '#6B49AD', backgroundColor: '#fff' }]} />
+          <Text style={styles.legendaTexto}>Hoje</Text>
+        </View>
+        <View style={styles.legendaItem}>
+          <View style={[styles.legendaQuadrado, { backgroundColor: '#EDE8FA' }]} />
+          <Text style={styles.legendaTexto}>Com evento</Text>
+        </View>
       </View>
     </View>
   )
@@ -183,7 +210,6 @@ export default function Dashboard() {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
 
-        // 1. Carrega Perfil
         const { data: perfil } = await supabase
           .from('perfis')
           .select('foto_url, nome')
@@ -199,7 +225,6 @@ export default function Dashboard() {
           }
         }
 
-        // 2. Carrega Dados dos Módulos
         try {
           const [medsRes, consRes, exasRes, sintsRes] = await Promise.all([
             supabase.from('medicamentos').select('*, medicamento_horarios(*)').eq('usuario_id', user.id),
@@ -248,7 +273,7 @@ export default function Dashboard() {
               <Image
                 source={{ uri: fotoUri }}
                 style={styles.fotoPerfil}
-                onError={(e) => { console.log('DASHBOARD ERRO foto:', e.nativeEvent.error, fotoUri); setFotoUri(null) }}
+                onError={() => setFotoUri(null)}
               />
             ) : (
               <View style={styles.fotoPerfilPlaceholder}>
@@ -339,6 +364,7 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingTop: 12 },
 
+  // Header
   card1: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -362,6 +388,7 @@ const styles = StyleSheet.create({
   },
   logoHeader: { width: 100, height: 36 },
 
+  // Saudação
   card2: {
     borderRadius: 24,
     paddingHorizontal: 24,
@@ -383,6 +410,7 @@ const styles = StyleSheet.create({
   card2Data: { color: '#C9A8FF', fontSize: 13, fontWeight: '600', marginBottom: 4 },
   card2Hora: { color: '#fff', fontSize: 42, fontWeight: '800', lineHeight: 46 },
 
+  // Lembrete — imagem encosta no segundo card (card3Fora)
   card3Fora: {
     backgroundColor: '#EDE8FA',
     borderRadius: 24,
@@ -391,7 +419,7 @@ const styles = StyleSheet.create({
   },
   card3Inner: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
     borderRadius: 20,
     overflow: 'hidden',
@@ -406,8 +434,10 @@ const styles = StyleSheet.create({
   card3Label: { fontSize: 10, fontWeight: '700', color: '#6B49AD', letterSpacing: 1, marginBottom: 8 },
   card3Tipo: { fontSize: 16, fontWeight: '700', color: '#301971', marginBottom: 4 },
   card3Desc: { fontSize: 14, fontWeight: '600', color: '#301971' },
-  card3Img: { width: 120, height: 120, marginRight: -2 },
+  // marginRight: 0 + alignItems: flex-end faz a imagem encostar no card externo
+  card3Img: { width: 120, height: 120, marginRight: 0, marginBottom: 0 },
 
+  // Ações rápidas
   acoesCard: {
     backgroundColor: '#fff',
     borderRadius: 24,
@@ -439,6 +469,7 @@ const styles = StyleSheet.create({
   },
   acaoLabel: { fontSize: 12, fontWeight: '700', color: '#301971', textAlign: 'center' },
 
+  // Calendário — responsivo, todos os dias aparecem incluindo sábado
   calendarioCard: {
     backgroundColor: '#fff',
     borderRadius: 24,
@@ -459,17 +490,35 @@ const styles = StyleSheet.create({
     borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, gap: 4,
   },
   seletorTexto: { fontSize: 13, fontWeight: '700', color: '#301971' },
+
+  // Semana: célula de largura fixa igual ao DIA_SIZE
   semanaRow: { flexDirection: 'row', marginBottom: 8 },
-  semanaTexto: { flex: 1, textAlign: 'center', fontSize: 12, fontWeight: '600', color: '#9163CB' },
+  semanaCell: { width: DIA_SIZE, alignItems: 'center' },
+  semanaTexto: { fontSize: 11, fontWeight: '700', color: '#9163CB' },
+
+  // Grade: cada célula tem largura fixa DIA_SIZE
   grade: { flexDirection: 'row', flexWrap: 'wrap' },
-  diaCell: { width: `${100 / 7}%`, alignItems: 'center', marginBottom: 4 },
-  diaBotao: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  diaCell: { width: DIA_SIZE, alignItems: 'center', marginBottom: 4 },
+  diaBotao: {
+    width: DIA_SIZE - 4,
+    height: DIA_SIZE - 4,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   diaHoje: { borderWidth: 1.5, borderColor: '#6B49AD' },
-  diaTexto: { fontSize: 14, color: '#301971', fontWeight: '500' },
+  diaTexto: { fontSize: 12, color: '#301971', fontWeight: '500' },
   diaHojeTexto: { color: '#6B49AD', fontWeight: '700' },
   diaComEvento: { backgroundColor: '#EDE8FA' },
   diaComEventoTexto: { color: '#6B49AD', fontWeight: '700' },
 
+  legendaDivisor: { height: 1, backgroundColor: '#F0EAFF', marginVertical: 10 },
+  legendaRow: { flexDirection: 'row', justifyContent: 'center', gap: 20 },
+  legendaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendaQuadrado: { width: 14, height: 14, borderRadius: 4 },
+  legendaTexto: { fontSize: 10, color: '#9163CB', fontWeight: '600' },
+
+  // Botão sair
   botaoSair: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -484,6 +533,7 @@ const styles = StyleSheet.create({
   },
   botaoSairTexto: { fontSize: 15, fontWeight: '700', color: '#6B49AD' },
 
+  // Modal
   modalFundo: {
     flex: 1,
     backgroundColor: '#00000066',

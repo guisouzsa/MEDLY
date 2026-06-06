@@ -1,17 +1,18 @@
 import { Feather } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
-import { useFocusEffect, useLocalSearchParams, router } from 'expo-router'
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useCallback, useEffect, useState } from 'react'
 import {
+  Image,
   Platform, ScrollView, StatusBar, StyleSheet,
-  Text, TouchableOpacity, View, Image,
+  Text, TouchableOpacity, View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { CalendarEvent, getEventsForDate } from '../../src/lib/events'
 import { supabase } from '../../src/lib/supabase'
-import { getEventsForDate, CalendarEvent } from '../../src/lib/events'
 
-const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
-const DIAS_SEMANA = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
+const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
 function getDiasDoMes(ano: number, mes: number) {
   const primeiroDia = new Date(ano, mes, 1).getDay()
@@ -20,6 +21,15 @@ function getDiasDoMes(ano: number, mes: number) {
   for (let d = 1; d <= totalDias; d++) celulas.push(d)
   while (celulas.length % 7 !== 0) celulas.push(null)
   return celulas
+}
+
+// ─── Agrupa as células em semanas de 7 dias ───────────────────────────────────
+function getSemanas(dias: (number | null)[]): (number | null)[][] {
+  const semanas: (number | null)[][] = []
+  for (let i = 0; i < dias.length; i += 7) {
+    semanas.push(dias.slice(i, i + 7))
+  }
+  return semanas
 }
 
 function formatarDataParaTela(data: string): string {
@@ -49,10 +59,10 @@ function getStatusMedCor(status: string) {
 }
 
 const TIPO_CONFIG: Record<string, { icon: any; bg: string; color: string; label: string }> = {
-  medicamento: { icon: 'activity',    bg: '#EDE8FA', color: '#6B49AD', label: 'Remédio'  },
-  consulta:    { icon: 'calendar',    bg: '#EDE8FA', color: '#6B49AD', label: 'Consulta' },
-  exame:       { icon: 'file-text',   bg: '#EDE8FA', color: '#6B49AD', label: 'Exame'    },
-  sintoma:     { icon: 'thermometer', bg: '#EDE8FA', color: '#6B49AD', label: 'Sintoma'  },
+  medicamento: { icon: 'activity', bg: '#EDE8FA', color: '#6B49AD', label: 'Remédio' },
+  consulta: { icon: 'calendar', bg: '#EDE8FA', color: '#6B49AD', label: 'Consulta' },
+  exame: { icon: 'file-text', bg: '#EDE8FA', color: '#6B49AD', label: 'Exame' },
+  sintoma: { icon: 'thermometer', bg: '#EDE8FA', color: '#6B49AD', label: 'Sintoma' },
 }
 
 function EventoCard({ event }: { event: CalendarEvent }) {
@@ -139,8 +149,10 @@ export default function TelaCalendario() {
   )
 
   const dias = getDiasDoMes(ano, mes)
+  const semanas = getSemanas(dias)
+
   function anterior() { mes === 0 ? (setMes(11), setAno(a => a - 1)) : setMes(m => m - 1) }
-  function proximo()  { mes === 11 ? (setMes(0),  setAno(a => a + 1)) : setMes(m => m + 1) }
+  function proximo() { mes === 11 ? (setMes(0), setAno(a => a + 1)) : setMes(m => m + 1) }
 
   const dataSelecionadaStr = diaSelecionado
     ? `${ano}-${String(mes + 1).padStart(2, '0')}-${String(diaSelecionado).padStart(2, '0')}`
@@ -153,94 +165,94 @@ export default function TelaCalendario() {
       render: () => dbData.medicamentos.length === 0
         ? <Text style={styles.registroVazio}>Nenhum medicamento cadastrado.</Text>
         : dbData.medicamentos.map(med => {
-            const sc = getStatusMedCor(med.status)
-            return (
-              <View key={med.id} style={styles.registroItem}>
-                <View style={[styles.registroItemIconBox, { backgroundColor: '#EDE8FA' }]}>
-                  <Feather name="activity" size={14} color="#6B49AD" />
-                </View>
-                <View style={styles.registroTextos}>
-                  <View style={styles.registroItemHeader}>
-                    <Text style={styles.registroNome} numberOfLines={1}>{med.nome}</Text>
-                    <View style={[styles.statusBadge, { backgroundColor: sc.bg }]}>
-                      <Text style={[styles.statusBadgeTexto, { color: sc.texto }]}>{sc.label}</Text>
-                    </View>
-                  </View>
-                  {med.dosagem ? <Text style={styles.registroSub}>Dosagem: {med.dosagem}</Text> : null}
-                  <Text style={styles.registroSub}>Frequência: {labelFrequencia(med)} · Início: {formatarDataParaTela(med.data_inicio)}</Text>
-                </View>
+          const sc = getStatusMedCor(med.status)
+          return (
+            <View key={med.id} style={styles.registroItem}>
+              <View style={[styles.registroItemIconBox, { backgroundColor: '#EDE8FA' }]}>
+                <Feather name="activity" size={14} color="#6B49AD" />
               </View>
-            )
-          }),
+              <View style={styles.registroTextos}>
+                <View style={styles.registroItemHeader}>
+                  <Text style={styles.registroNome} numberOfLines={1}>{med.nome}</Text>
+                  <View style={[styles.statusBadge, { backgroundColor: sc.bg }]}>
+                    <Text style={[styles.statusBadgeTexto, { color: sc.texto }]}>{sc.label}</Text>
+                  </View>
+                </View>
+                {med.dosagem ? <Text style={styles.registroSub}>Dosagem: {med.dosagem}</Text> : null}
+                <Text style={styles.registroSub}>Frequência: {labelFrequencia(med)} · Início: {formatarDataParaTela(med.data_inicio)}</Text>
+              </View>
+            </View>
+          )
+        }),
     },
     {
       key: 'cons', icon: 'calendar' as any, label: `Consultas (${dbData.consultas.length})`,
       render: () => dbData.consultas.length === 0
         ? <Text style={styles.registroVazio}>Nenhuma consulta cadastrada.</Text>
         : dbData.consultas.map(con => (
-            <View key={con.id} style={styles.registroItem}>
-              <View style={[styles.registroItemIconBox, { backgroundColor: '#EDE8FA' }]}>
-                <Feather name="calendar" size={14} color="#6B49AD" />
-              </View>
-              <View style={styles.registroTextos}>
-                <Text style={styles.registroNome} numberOfLines={1}>{con.especialidade}</Text>
-                <Text style={styles.registroSub}>Dr(a). {con.nome_medico}</Text>
-                <Text style={styles.registroSub}>{formatarDataParaTela(con.data)} às {con.horario?.slice(0,5) || '--:--'}</Text>
-                {con.local ? <Text style={styles.registroSub}>{con.local}</Text> : null}
-              </View>
+          <View key={con.id} style={styles.registroItem}>
+            <View style={[styles.registroItemIconBox, { backgroundColor: '#EDE8FA' }]}>
+              <Feather name="calendar" size={14} color="#6B49AD" />
             </View>
-          )),
+            <View style={styles.registroTextos}>
+              <Text style={styles.registroNome} numberOfLines={1}>{con.especialidade}</Text>
+              <Text style={styles.registroSub}>Dr(a). {con.nome_medico}</Text>
+              <Text style={styles.registroSub}>{formatarDataParaTela(con.data)} às {con.horario?.slice(0, 5) || '--:--'}</Text>
+              {con.local ? <Text style={styles.registroSub}>{con.local}</Text> : null}
+            </View>
+          </View>
+        )),
     },
     {
       key: 'exas', icon: 'file-text' as any, label: `Exames (${dbData.exames.length})`,
       render: () => dbData.exames.length === 0
         ? <Text style={styles.registroVazio}>Nenhum exame cadastrado.</Text>
         : dbData.exames.map(exa => (
-            <View key={exa.id} style={styles.registroItem}>
-              <View style={[styles.registroItemIconBox, { backgroundColor: '#EDE8FA' }]}>
-                <Feather name="file-text" size={14} color="#6B49AD" />
-              </View>
-              <View style={styles.registroTextos}>
-                <View style={styles.registroItemHeader}>
-                  <Text style={styles.registroNome} numberOfLines={1}>{exa.nome}</Text>
-                  {exa.arquivo_url ? (
-                    <View style={[styles.statusBadge, { backgroundColor: '#EDE8FA' }]}>
-                      <Text style={[styles.statusBadgeTexto, { color: '#6B49AD' }]}>Anexo</Text>
-                    </View>
-                  ) : null}
-                </View>
-                <Text style={styles.registroSub}>Realização: {formatarDataParaTela(exa.data_realizacao)}</Text>
-                {exa.local ? <Text style={styles.registroSub}>{exa.local}</Text> : null}
-                {exa.data_resultado ? <Text style={styles.registroSub}>Resultado: {formatarDataParaTela(exa.data_resultado)}</Text> : null}
-              </View>
+          <View key={exa.id} style={styles.registroItem}>
+            <View style={[styles.registroItemIconBox, { backgroundColor: '#EDE8FA' }]}>
+              <Feather name="file-text" size={14} color="#6B49AD" />
             </View>
-          )),
+            <View style={styles.registroTextos}>
+              <View style={styles.registroItemHeader}>
+                <Text style={styles.registroNome} numberOfLines={1}>{exa.nome}</Text>
+                {exa.arquivo_url ? (
+                  <View style={[styles.statusBadge, { backgroundColor: '#EDE8FA' }]}>
+                    <Text style={[styles.statusBadgeTexto, { color: '#6B49AD' }]}>Anexo</Text>
+                  </View>
+                ) : null}
+              </View>
+              <Text style={styles.registroSub}>Realização: {formatarDataParaTela(exa.data_realizacao)}</Text>
+              {exa.local ? <Text style={styles.registroSub}>{exa.local}</Text> : null}
+              {exa.data_resultado ? <Text style={styles.registroSub}>Resultado: {formatarDataParaTela(exa.data_resultado)}</Text> : null}
+            </View>
+          </View>
+        )),
     },
     {
       key: 'sints', icon: 'thermometer' as any, label: `Sintomas (${dbData.sintomas.length})`,
       render: () => dbData.sintomas.length === 0
         ? <Text style={styles.registroVazio}>Nenhum sintoma registrado.</Text>
         : dbData.sintomas.map(sin => {
-            const ic = getIntensidadeCor(sin.intensidade)
-            return (
-              <View key={sin.id} style={styles.registroItem}>
-                <View style={[styles.registroItemIconBox, { backgroundColor: '#EDE8FA' }]}>
-                  <Feather name="thermometer" size={14} color="#6B49AD" />
-                </View>
-                <View style={styles.registroTextos}>
-                  <View style={styles.registroItemHeader}>
-                    <Text style={styles.registroNome} numberOfLines={1}>{sin.nome}</Text>
-                    <View style={[styles.statusBadge, { backgroundColor: ic.bg }]}>
-                      <Text style={[styles.statusBadgeTexto, { color: ic.texto }]}>{sin.intensidade}/10 · {ic.label}</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.registroSub}>{formatarDataParaTela(sin.data)}{sin.horario ? ` às ${sin.horario.slice(0,5)}` : ''}</Text>
-                  {sin.duracao ? <Text style={styles.registroSub}>Duração: {sin.duracao}</Text> : null}
-                  {sin.gatilho ? <Text style={styles.registroSub}>Gatilho: {sin.gatilho}</Text> : null}
-                </View>
+          const ic = getIntensidadeCor(sin.intensidade)
+          return (
+            <View key={sin.id} style={styles.registroItem}>
+              <View style={[styles.registroItemIconBox, { backgroundColor: '#EDE8FA' }]}>
+                <Feather name="thermometer" size={14} color="#6B49AD" />
               </View>
-            )
-          }),
+              <View style={styles.registroTextos}>
+                <View style={styles.registroItemHeader}>
+                  <Text style={styles.registroNome} numberOfLines={1}>{sin.nome}</Text>
+                  <View style={[styles.statusBadge, { backgroundColor: ic.bg }]}>
+                    <Text style={[styles.statusBadgeTexto, { color: ic.texto }]}>{sin.intensidade}/10 · {ic.label}</Text>
+                  </View>
+                </View>
+                <Text style={styles.registroSub}>{formatarDataParaTela(sin.data)}{sin.horario ? ` às ${sin.horario.slice(0, 5)}` : ''}</Text>
+                {sin.duracao ? <Text style={styles.registroSub}>Duração: {sin.duracao}</Text> : null}
+                {sin.gatilho ? <Text style={styles.registroSub}>Gatilho: {sin.gatilho}</Text> : null}
+              </View>
+            </View>
+          )
+        }),
     },
   ]
 
@@ -274,7 +286,7 @@ export default function TelaCalendario() {
           <Text style={styles.cardTituloTexto}>CALENDÁRIO</Text>
         </LinearGradient>
 
-        {/* Calendário — idêntico ao da dashboard */}
+        {/* Calendário */}
         <View style={styles.calendarioCard}>
 
           {/* Nav */}
@@ -302,42 +314,46 @@ export default function TelaCalendario() {
             ))}
           </View>
 
-          {/* Grade */}
+          {/* ── GRADE CORRIGIDA: uma View por semana, cada célula com flex:1 ── */}
           <View style={styles.grade}>
-            {dias.map((dia, i) => {
-              const isHoje = dia === hoje.getDate() && mes === hoje.getMonth() && ano === hoje.getFullYear()
-              const isSelecionado = dia === diaSelecionado
-              let temEvento = false
-              if (dia !== null) {
-                const dayStr = `${ano}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
-                temEvento = getEventsForDate(dayStr, dbData).length > 0
-              }
-              return (
-                <View key={i} style={styles.diaCell}>
-                  {dia !== null ? (
-                    <TouchableOpacity
-                      style={[
-                        styles.diaBotao,
-                        isHoje && styles.diaHoje,
-                        temEvento && !isSelecionado && styles.diaComEvento,
-                        isSelecionado && styles.diaSelecionado,
-                      ]}
-                      onPress={() => setDiaSelecionado(dia)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[
-                        styles.diaTexto,
-                        isHoje && styles.diaHojeTexto,
-                        temEvento && !isSelecionado && styles.diaComEventoTexto,
-                        isSelecionado && styles.diaSelecionadoTexto,
-                      ]}>
-                        {dia}
-                      </Text>
-                    </TouchableOpacity>
-                  ) : <View style={styles.diaBotao} />}
-                </View>
-              )
-            })}
+            {semanas.map((semana, si) => (
+              <View key={si} style={styles.semanaLinha}>
+                {semana.map((dia, di) => {
+                  const isHoje = dia === hoje.getDate() && mes === hoje.getMonth() && ano === hoje.getFullYear()
+                  const isSelecionado = dia === diaSelecionado
+                  let temEvento = false
+                  if (dia !== null) {
+                    const dayStr = `${ano}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
+                    temEvento = getEventsForDate(dayStr, dbData).length > 0
+                  }
+                  return (
+                    <View key={di} style={styles.diaCell}>
+                      {dia !== null ? (
+                        <TouchableOpacity
+                          style={[
+                            styles.diaBotao,
+                            isHoje && styles.diaHoje,
+                            temEvento && !isSelecionado && styles.diaComEvento,
+                            isSelecionado && styles.diaSelecionado,
+                          ]}
+                          onPress={() => setDiaSelecionado(dia)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[
+                            styles.diaTexto,
+                            isHoje && styles.diaHojeTexto,
+                            temEvento && !isSelecionado && styles.diaComEventoTexto,
+                            isSelecionado && styles.diaSelecionadoTexto,
+                          ]}>
+                            {dia}
+                          </Text>
+                        </TouchableOpacity>
+                      ) : <View style={styles.diaBotao} />}
+                    </View>
+                  )
+                })}
+              </View>
+            ))}
           </View>
 
           {/* Legenda */}
@@ -454,7 +470,6 @@ const styles = StyleSheet.create({
   },
   cardTituloTexto: { fontSize: 14, fontWeight: '800', color: '#fff', letterSpacing: 3 },
 
-  // Calendário — igual ao da dashboard
   calendarioCard: {
     backgroundColor: '#fff', borderRadius: 24, padding: 16, marginBottom: 12,
   },
@@ -469,10 +484,17 @@ const styles = StyleSheet.create({
     borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, gap: 4,
   },
   seletorTexto: { fontSize: 13, fontWeight: '700', color: '#301971' },
+
   semanaRow: { flexDirection: 'row', marginBottom: 8 },
   semanaTexto: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '700', color: '#9163CB' },
-  grade: { flexDirection: 'row', flexWrap: 'wrap' },
-  diaCell: { width: `${100 / 7}%`, alignItems: 'center', marginBottom: 4 },
+
+  // ── CORREÇÃO: grade sem flexWrap, semanaLinha com flex row ──────────────────
+  grade: { flexDirection: 'column' },
+  semanaLinha: { flexDirection: 'row', marginBottom: 4 },
+  // diaCell com flex:1 garante exatamente 1/7 da largura sem arredondamento
+  diaCell: { flex: 1, alignItems: 'center' },
+  // ────────────────────────────────────────────────────────────────────────────
+
   diaBotao: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   diaHoje: { borderWidth: 1.5, borderColor: '#6B49AD' },
   diaSelecionado: { backgroundColor: '#6B49AD' },
@@ -488,7 +510,6 @@ const styles = StyleSheet.create({
   legendaQuadrado: { width: 14, height: 14, borderRadius: 4 },
   legendaTexto: { fontSize: 10, color: '#9163CB', fontWeight: '600' },
 
-  // Eventos
   eventosCard: {
     backgroundColor: '#fff', borderRadius: 24, padding: 16, marginBottom: 12,
     shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 4 },
@@ -523,12 +544,10 @@ const styles = StyleSheet.create({
   eventoHoraRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   eventoHoraTexto: { fontSize: 11, fontWeight: '600', color: '#9163CB' },
 
-  // Divisor seção
   secaoDivisor: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   secaoDivisorLinha: { flex: 1, height: 1, backgroundColor: '#DDD6FE' },
   secaoDivisorTexto: { fontSize: 10, fontWeight: '800', color: '#9163CB', letterSpacing: 1 },
 
-  // Acordions
   acordionsContainer: { gap: 6 },
   acordionWrapper: {},
   accordionHeader: {
@@ -551,7 +570,6 @@ const styles = StyleSheet.create({
     padding: 8, gap: 6,
   },
 
-  // Registros
   registroItem: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: '#fff', borderRadius: 12, padding: 11,
