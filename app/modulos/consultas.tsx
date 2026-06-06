@@ -3,12 +3,12 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { router, useLocalSearchParams } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import {
-    Alert,
     Animated, Dimensions, Image, KeyboardAvoidingView, Modal,
     Platform, ScrollView, StyleSheet, Text, TextInput,
     TouchableOpacity, View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import ModalAlerta from '../../src/components/ModalAlerta'
 import { salvarHistorico } from '../../src/lib/events'
 import { supabase } from '../../src/lib/supabase'
 
@@ -270,6 +270,8 @@ export default function Consultas() {
     const [modalExcluir, setModalExcluir] = useState(false)
     const [excluirId, setExcluirId] = useState<number | null>(null)
     const [erros, setErros] = useState<Record<string, boolean>>({})
+    const [modalAlerta, setModalAlerta] = useState({ visivel: false, titulo: '', mensagem: '' })
+    const [modalSucesso, setModalSucesso] = useState({ visivel: false, titulo: '', mensagem: '' })
 
     // ── Init ──────────────────────────────────────────────────────────────────
 
@@ -390,7 +392,7 @@ export default function Consultas() {
         if (!horario || horario.length < 5) novosErros.horario = true
         setErros(novosErros)
         if (Object.keys(novosErros).length > 0) {
-            Alert.alert('Campos obrigatórios', 'Preencha todos os campos destacados antes de continuar.')
+            setModalAlerta({ visivel: true, titulo: 'Campos obrigatórios', mensagem: 'Preencha todos os campos destacados antes de continuar.' })
             return false
         }
         return true
@@ -400,7 +402,11 @@ export default function Consultas() {
 
     async function salvar() {
         if (!validar()) return
-        if (!usuarioId) { Alert.alert('Erro', 'Usuário não autenticado.'); router.replace('/auth'); return }
+        if (!usuarioId) {
+            setModalAlerta({ visivel: true, titulo: 'Erro', mensagem: 'Usuário não autenticado.' })
+            router.replace('/auth')
+            return
+        }
         setCarregando(true)
         try {
             const payload = {
@@ -424,8 +430,13 @@ export default function Consultas() {
             }
             fecharModal()
             await buscar()
+            setModalSucesso({
+                visivel: true,
+                titulo: editando ? 'Consulta atualizada!' : 'Consulta cadastrada!',
+                mensagem: editando ? `${especialidade.trim()} foi atualizada com sucesso.` : `${especialidade.trim()} foi agendada.`,
+            })
         } catch (err: any) {
-            Alert.alert('Erro ao salvar', err.message ?? 'Tente novamente.')
+            setModalAlerta({ visivel: true, titulo: 'Erro ao salvar', mensagem: err.message ?? 'Tente novamente.' })
         } finally {
             setCarregando(false)
         }
@@ -439,13 +450,21 @@ export default function Consultas() {
         if (!excluirId) return
         const con = lista.find(c => c.id === excluirId)
         const { error } = await supabase.from('consultas').delete().eq('id', excluirId)
-        if (error) { Alert.alert('Erro ao excluir', error.message); return }
+        if (error) {
+            setModalAlerta({ visivel: true, titulo: 'Erro ao excluir', mensagem: error.message })
+            return
+        }
         if (con) {
             await salvarHistorico(usuarioId!, `Consulta de ${con.especialidade} com Dr(a). ${con.nome_medico} foi removida`)
         }
         setModalExcluir(false)
         setExcluirId(null)
         await buscar()
+        setModalSucesso({
+            visivel: true,
+            titulo: 'Consulta excluída!',
+            mensagem: `A consulta de ${con?.especialidade ?? 'especialidade'} foi removida com sucesso.`,
+        })
     }
 
     // ── Render ────────────────────────────────────────────────────────────────
@@ -638,6 +657,22 @@ export default function Consultas() {
                     </View>
                 </View>
             </Modal>
+
+            {/* Modal de alerta (erro/validação) */}
+            <ModalAlerta
+                visivel={modalAlerta.visivel}
+                titulo={modalAlerta.titulo}
+                mensagem={modalAlerta.mensagem}
+                onFechar={() => setModalAlerta({ visivel: false, titulo: '', mensagem: '' })}
+            />
+
+            {/* Modal de sucesso */}
+            <ModalAlerta
+                visivel={modalSucesso.visivel}
+                titulo={modalSucesso.titulo}
+                mensagem={modalSucesso.mensagem}
+                onFechar={() => setModalSucesso({ visivel: false, titulo: '', mensagem: '' })}
+            />
 
         </SafeAreaView>
     )

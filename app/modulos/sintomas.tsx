@@ -25,7 +25,7 @@ type Sintoma = {
     observacoes: string | null
 }
 
-type Filtro = 'todos' | 'hoje' | 'semana'
+type Filtro = 'hoje' | 'semana' | 'todos'
 
 const PAIN_SCALE = [
     { valor: 0, emoji: '😌', label: 'Sem dor', roxo: '#F3EEFF' },
@@ -69,16 +69,16 @@ function mascaraHorario(texto: string): string {
 function filtrarPorPeriodo(lista: Sintoma[], filtro: Filtro): Sintoma[] {
     if (filtro === 'todos') return lista
     const agora = new Date()
-    agora.setHours(0, 0, 0, 0)
+    const hojeStr = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}-${String(agora.getDate()).padStart(2, '0')}`
     return lista.filter((sint) => {
         if (!sint.data) return false
-        const dataSint = new Date(sint.data)
-        dataSint.setHours(0, 0, 0, 0)
-        if (filtro === 'hoje') return dataSint.getTime() === agora.getTime()
+        const dataStr = sint.data.slice(0, 10)
+        if (filtro === 'hoje') return dataStr === hojeStr
         if (filtro === 'semana') {
             const seteDias = new Date(agora)
             seteDias.setDate(agora.getDate() - 6)
-            return dataSint >= seteDias && dataSint <= agora
+            const seteDiasStr = `${seteDias.getFullYear()}-${String(seteDias.getMonth() + 1).padStart(2, '0')}-${String(seteDias.getDate()).padStart(2, '0')}`
+            return dataStr >= seteDiasStr && dataStr <= hojeStr
         }
         return true
     })
@@ -130,19 +130,16 @@ function Campo({
 
 function PainScale({ value, onChange }: { value: number, onChange: (v: number) => void }) {
     const atual = PAIN_SCALE[value]
-
     return (
         <View style={styles.campoWrapper}>
             <View style={styles.campoLabelRow}>
                 <Text style={styles.campoLabel}>INTENSIDADE DA DOR</Text>
             </View>
-
             <View style={[styles.painCentro, { backgroundColor: atual.roxo }]}>
                 <Text style={styles.painEmoji}>{atual.emoji}</Text>
                 <Text style={[styles.painValor, { color: value <= 3 ? '#481D94' : '#fff' }]}>{value}/10</Text>
                 <Text style={[styles.painLabel, { color: value <= 3 ? '#6B49AD' : '#E2D9F3' }]}>{atual.label}</Text>
             </View>
-
             <View style={styles.painNumeros}>
                 {PAIN_SCALE.map((item) => (
                     <TouchableOpacity
@@ -164,7 +161,6 @@ function PainScale({ value, onChange }: { value: number, onChange: (v: number) =
                     </TouchableOpacity>
                 ))}
             </View>
-
             <Text style={styles.painDica}>Quanto mais roxo, maior a intensidade da dor.</Text>
         </View>
     )
@@ -175,7 +171,7 @@ export default function Sintomas() {
     const [usuarioId, setUsuarioId] = useState<string | null>(null)
     const [lista, setLista] = useState<Sintoma[]>([])
     const [perfilFoto, setPerfilFoto] = useState<string | null>(null)
-    const [filtro, setFiltro] = useState<Filtro>('todos')
+    const [filtro, setFiltro] = useState<Filtro>('hoje')
 
     const [modalVisivel, setModalVisivel] = useState(false)
     const [editando, setEditando] = useState<Sintoma | null>(null)
@@ -317,16 +313,25 @@ export default function Sintomas() {
         if (!excluirId) return
         const sint = lista.find(s => s.id === excluirId)
         const { error } = await supabase.from('sintomas').delete().eq('id', excluirId)
-        if (error) { setModalAlerta({ visivel: true, titulo: 'Erro ao excluir', mensagem: error.message }); return }
+        if (error) {
+            setModalAlerta({ visivel: true, titulo: 'Erro ao excluir', mensagem: error.message })
+            return
+        }
         if (sint) await salvarHistorico(usuarioId!, `Sintoma ${sint.nome} foi removido`)
-        setModalExcluir(false); setExcluirId(null)
+        setModalExcluir(false)
+        setExcluirId(null)
         await buscar()
+        setModalSucesso({
+            visivel: true,
+            titulo: 'Sintoma excluído!',
+            mensagem: `${sint?.nome ?? 'O sintoma'} foi removido com sucesso.`,
+        })
     }
 
-    const filtroLabels: Record<Filtro, string> = { todos: 'Todos', hoje: 'Hoje', semana: 'Semana' }
+    // ordem: Hoje → Semana → Todos
+    const filtroLabels: Record<Filtro, string> = { hoje: 'Hoje', semana: 'Semana', todos: 'Todos' }
+    const filtroOrdem: Filtro[] = ['hoje', 'semana', 'todos']
     const listaFiltrada = filtrarPorPeriodo(lista, filtro)
-
-    // ─── Render ───────────────────────────────────────────────────────────────
 
     return (
         <SafeAreaView style={styles.safe} edges={['top']}>
@@ -358,9 +363,9 @@ export default function Sintomas() {
                     <Text style={styles.cardTituloTexto}>SINTOMAS</Text>
                 </LinearGradient>
 
-                {/* Filtros — estilo chips do medicamentos */}
+                {/* Filtros — ordem: Hoje → Semana → Todos */}
                 <View style={styles.filtrosRow}>
-                    {(['todos', 'hoje', 'semana'] as Filtro[]).map((f) => (
+                    {filtroOrdem.map((f) => (
                         <TouchableOpacity
                             key={f}
                             onPress={() => setFiltro(f)}
@@ -399,7 +404,7 @@ export default function Sintomas() {
                             <Text style={styles.vazioSub}>Toque em "+" para adicionar</Text>
                         </View>
                     ) : (
-                        lista.map((sint) => {
+                        listaFiltrada.map((sint) => {
                             const pain = PAIN_SCALE[sint.intensidade]
                             return (
                                 <View key={sint.id} style={styles.card}>
@@ -518,11 +523,9 @@ export default function Sintomas() {
 
                             <Campo label="DURAÇÃO" value={duracao} onChangeText={setDuracao}
                                 placeholder="Ex: 2 horas" opcional />
-
                             <Campo label="GATILHO" value={gatilho} onChangeText={setGatilho}
                                 placeholder="Ex: Estresse, alimentação" opcional
                                 dica="O que pode ter causado este sintoma?" />
-
                             <Campo label="OBSERVAÇÕES" value={observacoes} onChangeText={setObservacoes}
                                 placeholder="Informações adicionais" opcional />
 
@@ -543,7 +546,7 @@ export default function Sintomas() {
                 </KeyboardAvoidingView>
             </Modal>
 
-            {/* Modal excluir */}
+            {/* Modal excluir — flutuando no centro, sem encostar em bordas */}
             <Modal visible={modalExcluir} transparent animationType="fade">
                 <View style={styles.modalExcluirFundo}>
                     <View style={styles.modalExcluirCard}>
@@ -551,7 +554,7 @@ export default function Sintomas() {
                             <Feather name="trash-2" size={32} color="#dc2626" />
                         </View>
                         <Text style={styles.modalExcluirTitulo}>Excluir sintoma?</Text>
-                        <Text style={styles.modalExcluirMsg}>Esta ação não pode ser desfeita.</Text>
+                        <Text style={styles.modalExcluirMsg}>Tem certeza? Esta ação não pode ser desfeita.</Text>
                         <TouchableOpacity onPress={excluir} activeOpacity={0.85} style={styles.btnExcluirConfirmar}>
                             <Text style={styles.btnExcluirConfirmarTexto}>SIM, EXCLUIR</Text>
                         </TouchableOpacity>
@@ -562,20 +565,29 @@ export default function Sintomas() {
                 </View>
             </Modal>
 
-            <ModalAlerta visivel={modalAlerta.visivel} titulo={modalAlerta.titulo} mensagem={modalAlerta.mensagem}
-                onFechar={() => setModalAlerta(m => ({ ...m, visivel: false }))} />
-            <ModalAlerta visivel={modalSucesso.visivel} titulo={modalSucesso.titulo} mensagem={modalSucesso.mensagem}
-                onFechar={() => setModalSucesso(m => ({ ...m, visivel: false }))} />
+            {/* Modal alerta (erros) */}
+            <ModalAlerta
+                visivel={modalAlerta.visivel}
+                titulo={modalAlerta.titulo}
+                mensagem={modalAlerta.mensagem}
+                onFechar={() => setModalAlerta(m => ({ ...m, visivel: false }))}
+            />
+
+            {/* Modal sucesso (salvar/editar) */}
+            <ModalAlerta
+                visivel={modalSucesso.visivel}
+                titulo={modalSucesso.titulo}
+                mensagem={modalSucesso.mensagem}
+                onFechar={() => setModalSucesso(m => ({ ...m, visivel: false }))}
+            />
+
         </SafeAreaView>
     )
 }
 
-// ─── Styles — espelho exato do medicamentos.tsx ───────────────────────────────
-
 const styles = StyleSheet.create({
     safe: { flex: 1, backgroundColor: '#F5F0FF' },
 
-    // Header
     cardPerfil: {
         backgroundColor: '#fff', marginHorizontal: 16, marginTop: 16,
         borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10,
@@ -594,7 +606,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center', alignItems: 'center',
     },
 
-    // Título
     cardTituloLista: {
         marginHorizontal: 16, marginTop: 12, borderRadius: 50,
         paddingVertical: 14, alignItems: 'center',
@@ -603,7 +614,6 @@ const styles = StyleSheet.create({
     },
     cardTituloTexto: { fontSize: 14, fontWeight: '800', color: '#fff', letterSpacing: 3 },
 
-    // Filtros — chips do medicamentos
     filtrosRow: {
         flexDirection: 'row', alignItems: 'center',
         marginHorizontal: 16, marginTop: 12, gap: 8,
@@ -622,7 +632,6 @@ const styles = StyleSheet.create({
     chipTexto: { fontSize: 12, fontWeight: '700', color: '#481D94' },
     chipTextoAtivo: { fontSize: 12, fontWeight: '700', color: '#fff' },
 
-    // FAB
     fab: {
         position: 'absolute', bottom: 28, right: 24,
         borderRadius: 999,
@@ -631,7 +640,6 @@ const styles = StyleSheet.create({
     },
     fabGradient: { width: 60, height: 60, borderRadius: 999, justifyContent: 'center', alignItems: 'center' },
 
-    // Lista
     cardLista: {
         marginHorizontal: 16, marginTop: 14, backgroundColor: '#fff',
         borderRadius: 24, padding: 16,
@@ -646,7 +654,6 @@ const styles = StyleSheet.create({
     vazioTitulo: { fontSize: 17, fontWeight: '700', color: '#301971' },
     vazioSub: { fontSize: 14, color: '#9163CB' },
 
-    // Card — espelho do medicamentos
     card: {
         backgroundColor: '#FAFAFE', borderRadius: 18, padding: 16,
         borderWidth: 1, borderColor: '#EDE8FA',
@@ -669,12 +676,10 @@ const styles = StyleSheet.create({
     },
     cardDivisor: { height: 1, backgroundColor: '#F0EAFF', marginVertical: 12 },
     cardInfos: { gap: 8 },
-
     infoLinha: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     infoLinhaLabel: { fontSize: 13, fontWeight: '700', color: '#9163CB', flexShrink: 0, marginRight: 4 },
     infoLinhaTexto: { fontSize: 13, color: '#301971', fontWeight: '600', flex: 1 },
 
-    // Pain Scale
     painCentro: {
         alignItems: 'center', borderRadius: 20,
         paddingVertical: 24, marginBottom: 16,
@@ -697,7 +702,6 @@ const styles = StyleSheet.create({
         marginTop: 12, fontStyle: 'italic',
     },
 
-    // Modal form
     modalFundo: { flex: 1 },
     modalOverlay: { flex: 1, backgroundColor: '#00000055' },
     modalCard: {
@@ -736,23 +740,40 @@ const styles = StyleSheet.create({
     botaoSalvar: { borderRadius: 50, paddingVertical: 18, alignItems: 'center' },
     botaoSalvarTexto: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 2 },
 
-    // Modal excluir — bottom sheet (igual ao medicamentos)
-    modalExcluirFundo: { flex: 1, backgroundColor: '#00000066', justifyContent: 'flex-end' },
+    // Modal excluir — flutuando no centro
+    modalExcluirFundo: {
+        flex: 1,
+        backgroundColor: '#00000066',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 32,   // margem lateral para não encostar nas bordas
+    },
     modalExcluirCard: {
-        backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28,
-        padding: 32, alignItems: 'center', gap: 12,
+        backgroundColor: '#fff',
+        borderRadius: 28,
+        padding: 32,
+        width: '100%',
+        alignItems: 'center',
+        gap: 12,
+        shadowColor: '#301971',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.25,
+        shadowRadius: 20,
+        elevation: 14,
     },
     modalExcluirIcone: {
         width: 72, height: 72, borderRadius: 24, backgroundColor: '#FFF1F2',
-        justifyContent: 'center', alignItems: 'center', marginBottom: 8,
+        justifyContent: 'center', alignItems: 'center', marginBottom: 4,
     },
     modalExcluirTitulo: { fontSize: 20, fontWeight: '800', color: '#301971' },
-    modalExcluirMsg: { fontSize: 15, color: '#6B49AD', marginBottom: 8 },
+    modalExcluirMsg: { fontSize: 14, color: '#6B49AD', textAlign: 'center', lineHeight: 20 },
     btnExcluirConfirmar: {
         width: '100%', backgroundColor: '#dc2626',
-        borderRadius: 50, paddingVertical: 18, alignItems: 'center',
+        borderRadius: 50, paddingVertical: 16, alignItems: 'center', marginTop: 4,
     },
     btnExcluirConfirmarTexto: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 2 },
-    btnCancelar: { paddingVertical: 14 },
+    btnCancelar: { paddingVertical: 12 },
     btnCancelarTexto: { fontSize: 15, fontWeight: '600', color: '#9163CB' },
+
+    // Modal roxo de confirmação pós-exclusão
 })

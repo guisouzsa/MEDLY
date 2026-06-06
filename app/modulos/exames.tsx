@@ -6,12 +6,12 @@ import * as FileSystem from 'expo-file-system/legacy'
 import { decode } from 'base64-arraybuffer'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  Alert,
   Animated, Dimensions, Image, KeyboardAvoidingView, Modal,
   Platform, ScrollView, StyleSheet, Text, TextInput,
   TouchableOpacity, View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import ModalAlerta from '../../src/components/ModalAlerta'
 import { supabase } from '../../src/lib/supabase'
 import { salvarHistorico } from '../../src/lib/events'
 
@@ -386,6 +386,8 @@ export default function Exames() {
   const [modalExcluir, setModalExcluir] = useState(false)
   const [excluirId, setExcluirId] = useState<number | null>(null)
   const [erros, setErros] = useState<Record<string, boolean>>({})
+  const [modalAlerta, setModalAlerta] = useState({ visivel: false, titulo: '', mensagem: '' })
+  const [modalSucesso, setModalSucesso] = useState({ visivel: false, titulo: '', mensagem: '' })
 
   // ── Visualizador de arquivo ───────────────────────────────────────────────
   const [viewerVisivel, setViewerVisivel] = useState(false)
@@ -526,7 +528,7 @@ export default function Exames() {
     if (!horario || horario.length < 5) novosErros.horario = true
     setErros(novosErros)
     if (Object.keys(novosErros).length > 0) {
-      Alert.alert('Campos obrigatórios', 'Preencha todos os campos destacados antes de continuar.')
+      setModalAlerta({ visivel: true, titulo: 'Campos obrigatórios', mensagem: 'Preencha todos os campos destacados antes de continuar.' })
       return false
     }
     return true
@@ -552,7 +554,7 @@ export default function Exames() {
       }
     } catch (err) {
       console.error('Erro ao escolher arquivo:', err)
-      Alert.alert('Erro', 'Não foi possível selecionar o arquivo.')
+      setModalAlerta({ visivel: true, titulo: 'Erro', mensagem: 'Não foi possível selecionar o arquivo.' })
     }
   }
 
@@ -574,7 +576,7 @@ export default function Exames() {
 
   async function salvar() {
     if (!validar()) return
-    if (!usuarioId) { Alert.alert('Erro', 'Usuário não autenticado.'); router.replace('/auth'); return }
+    if (!usuarioId) { setModalAlerta({ visivel: true, titulo: 'Erro', mensagem: 'Usuário não autenticado.' }); router.replace('/auth'); return }
 
     setCarregando(true)
     try {
@@ -630,9 +632,14 @@ export default function Exames() {
 
       fecharModal()
       await buscar()
+      setModalSucesso({
+        visivel: true,
+        titulo: editando ? 'Exame atualizado!' : 'Exame cadastrado!',
+        mensagem: editando ? `${nome.trim()} foi atualizado com sucesso.` : `${nome.trim()} foi cadastrado.`,
+      })
     } catch (err: any) {
       console.error('Erro ao salvar:', err.message)
-      Alert.alert('Erro ao salvar', err.message ?? 'Tente novamente.')
+      setModalAlerta({ visivel: true, titulo: 'Erro ao salvar', mensagem: err.message ?? 'Tente novamente.' })
     } finally {
       setCarregando(false)
     }
@@ -646,13 +653,18 @@ export default function Exames() {
     if (!excluirId) return
     const exa = lista.find(e => e.id === excluirId)
     const { error } = await supabase.from('exames').delete().eq('id', excluirId)
-    if (error) { Alert.alert('Erro ao excluir', error.message); return }
+    if (error) { setModalAlerta({ visivel: true, titulo: 'Erro ao excluir', mensagem: error.message }); return }
     if (exa) {
       await salvarHistorico(usuarioId!, `Exame ${exa.nome} foi removido`)
     }
     setModalExcluir(false)
     setExcluirId(null)
     await buscar()
+    setModalSucesso({
+      visivel: true,
+      titulo: 'Exame excluído!',
+      mensagem: `O exame ${exa?.nome ?? 'selecionado'} foi removido com sucesso.`,
+    })
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -907,6 +919,22 @@ export default function Exames() {
         url={viewerUrl}
         isImage={viewerIsImage}
         onFechar={() => setViewerVisivel(false)}
+      />
+
+      {/* Modal de alerta (erro/validação) */}
+      <ModalAlerta
+        visivel={modalAlerta.visivel}
+        titulo={modalAlerta.titulo}
+        mensagem={modalAlerta.mensagem}
+        onFechar={() => setModalAlerta({ visivel: false, titulo: '', mensagem: '' })}
+      />
+
+      {/* Modal de sucesso */}
+      <ModalAlerta
+        visivel={modalSucesso.visivel}
+        titulo={modalSucesso.titulo}
+        mensagem={modalSucesso.mensagem}
+        onFechar={() => setModalSucesso({ visivel: false, titulo: '', mensagem: '' })}
       />
 
     </SafeAreaView>

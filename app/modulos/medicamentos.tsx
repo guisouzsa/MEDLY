@@ -687,6 +687,11 @@ export default function Medicamentos() {
     if (med) await salvarHistorico(usuarioId!, `Medicamento ${med.nome} foi removido`)
     setModalExcluir(false); setExcluirId(null)
     await buscar()
+    setModalSucesso({
+      visivel: true,
+      titulo: 'Medicamento excluído!',
+      mensagem: `${med?.nome ?? 'O medicamento'} foi removido com sucesso.`,
+    })
   }
 
   function renderSemanal() {
