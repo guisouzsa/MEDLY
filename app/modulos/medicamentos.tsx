@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import ModalAlerta from '../../src/components/ModalAlerta'
 import { supabase } from '../../src/lib/supabase'
+import { salvarHistorico } from '../../src/lib/events'
 
 const { height } = Dimensions.get('window')
 
@@ -101,7 +102,7 @@ function labelFrequencia(med: Medicamento): string {
 
 function Campo({
   label, value, onChangeText, placeholder, keyboardType = 'default' as any,
-  opcional = false, dica, erro, erroTexto, obrigatorio = false,
+  opcional = false, dica, erro, erroTexto,
 }: {
   label: string
   value: string
@@ -109,7 +110,6 @@ function Campo({
   placeholder?: string
   keyboardType?: any
   opcional?: boolean
-  obrigatorio?: boolean
   dica?: string
   erro?: boolean
   erroTexto?: string
@@ -118,7 +118,6 @@ function Campo({
     <View style={styles.campoWrapper}>
       <View style={styles.campoLabelRow}>
         <Text style={styles.campoLabel}>{label}</Text>
-        {obrigatorio && <Text style={styles.asterisco}>*</Text>}
         {opcional && (
           <View style={styles.tagOpcional}>
             <Text style={styles.tagOpcionalTexto}>opcional</Text>
@@ -233,7 +232,7 @@ function GrupoHorarios({
 
 
 export default function Medicamentos() {
-  const { abrir } = useLocalSearchParams()
+  const { action } = useLocalSearchParams()
 
   const [usuarioId, setUsuarioId] = useState<string | null>(null)
   const [lista, setLista] = useState<Medicamento[]>([])
@@ -273,8 +272,8 @@ export default function Medicamentos() {
 
 
   useEffect(() => {
-    if (abrir === 'true') abrirModal()
-  }, [abrir])
+    if (action === 'create') abrirModal()
+  }, [action])
 
   useFocusEffect(
     useCallback(() => {
@@ -491,6 +490,8 @@ export default function Medicamentos() {
         if (erroHorarios) throw erroHorarios
       }
 
+      await salvarHistorico(usuarioId, editando ? `Medicamento ${nome.trim()} (${dosagem.trim()}) foi alterado` : `Medicamento ${nome.trim()} (${dosagem.trim()}) foi cadastrado`)
+
       fecharModal()
       await buscar()
       setModalSucesso({
@@ -510,8 +511,12 @@ export default function Medicamentos() {
   function confirmarExcluir(id: number) { setExcluirId(id); setModalExcluir(true) }
   async function excluir() {
     if (!excluirId) return
+    const med = lista.find(m => m.id === excluirId)
     const { error } = await supabase.from('medicamentos').delete().eq('id', excluirId)
     if (error) { setModalAlerta({ visivel: true, titulo: 'Erro ao excluir', mensagem: error.message }); return }
+    if (med) {
+      await salvarHistorico(usuarioId!, `Medicamento ${med.nome} foi removido`)
+    }
     setModalExcluir(false); setExcluirId(null)
     await buscar()
   }
@@ -718,7 +723,7 @@ export default function Medicamentos() {
         {/* Botões abaixo do card REMÉDIOS — canto direito */}
         <View style={styles.botoesAcao}>
           <TouchableOpacity
-            onPress={() => router.push('/modulos/historico' as any)}
+            onPress={() => router.push({ pathname: '/modulos/historico', params: { modulo: 'medicamento' } } as any)}
             activeOpacity={0.85}
             style={styles.btnAcaoSecundario}
           >
@@ -861,18 +866,18 @@ export default function Medicamentos() {
 
               <Campo label="NOME DO MEDICAMENTO" value={nome}
                 onChangeText={(v) => { setNome(v); setErros(p => ({ ...p, nome: false })) }}
-                placeholder="Ex: Paracetamol" erro={erros.nome} obrigatorio />
+                placeholder="Ex: Paracetamol" erro={erros.nome} />
 
               <View style={styles.duasColunas}>
                 <View style={styles.coluna}>
                   <Campo label="DOSAGEM" value={dosagem}
                     onChangeText={(v) => { setDosagem(v); setErros(p => ({ ...p, dosagem: false })) }}
-                    placeholder="Ex: 500mg" erro={erros.dosagem} obrigatorio />
+                    placeholder="Ex: 500mg" erro={erros.dosagem} />
                 </View>
                 <View style={styles.coluna}>
                   <Campo label="QTDE POR DOSE" value={quantidadePorDose}
                     onChangeText={(v) => { setQuantidadePorDose(v); setErros(p => ({ ...p, quantidadePorDose: false })) }}
-                    placeholder="Ex: 1 comp." erro={erros.quantidadePorDose} obrigatorio />
+                    placeholder="Ex: 1 comp." erro={erros.quantidadePorDose} />
                 </View>
               </View>
 
@@ -890,13 +895,13 @@ export default function Medicamentos() {
               {frequenciaTipo === 'personalizado' && (
                 <Campo label="INTERVALO EM HORAS" value={intervaloHoras}
                   onChangeText={(v) => { setIntervaloHoras(v); setErros(p => ({ ...p, intervaloHoras: false })) }}
-                  placeholder="Ex: 8" keyboardType="numeric" erro={erros.intervaloHoras} obrigatorio
+                  placeholder="Ex: 8" keyboardType="numeric" erro={erros.intervaloHoras}
                   dica="O medicamento será lembrado a cada X horas a partir do início." />
               )}
 
               <Campo label="DATA INÍCIO" value={dataInicio}
                 onChangeText={(t) => { setDataInicio(mascaraData(t)); setErros(p => ({ ...p, dataInicio: false, dataInicioPassada: false })) }}
-                placeholder="DD/MM/AAAA" keyboardType="numeric" obrigatorio
+                placeholder="DD/MM/AAAA" keyboardType="numeric"
                 erro={erros.dataInicio || erros.dataInicioPassada}
                 erroTexto={erros.dataInicioPassada ? 'A data de início não pode ser uma data passada' : 'Este campo é obrigatório'} />
 
@@ -936,7 +941,7 @@ export default function Medicamentos() {
                   <Text style={styles.statusBoxSub}>Esta data será usada para lembrar você de retomar o medicamento.</Text>
                   <Campo label="DATA DE RETORNO" value={dataRetorno}
                     onChangeText={(t) => { setDataRetorno(mascaraData(t)); setErros(p => ({ ...p, dataRetorno: false })) }}
-                    placeholder="DD/MM/AAAA" keyboardType="numeric" obrigatorio
+                    placeholder="DD/MM/AAAA" keyboardType="numeric"
                     erro={erros.dataRetorno} erroTexto="Informe a data de retorno" />
                 </View>
               )}
@@ -1132,7 +1137,7 @@ const styles = StyleSheet.create({
   campoWrapper: { marginBottom: 20 },
   campoLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   campoLabel: { fontSize: 11, fontWeight: '700', color: '#9163CB', letterSpacing: 1.2 },
-  asterisco: { fontSize: 13, fontWeight: '800', color: '#481D94', lineHeight: 16 },
+
   tagOpcional: {
     backgroundColor: '#EDE8FA', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3,
     borderWidth: 1, borderColor: '#C4B5FD',
