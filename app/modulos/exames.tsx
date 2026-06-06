@@ -53,7 +53,7 @@ function mascaraData(texto: string): string {
 function Campo({
   label, value, onChangeText, placeholder,
   keyboardType = 'default' as any,
-  opcional = false, obrigatorio = false,
+  obrigatorio = false,
   multiline = false, erro,
 }: {
   label: string
@@ -61,7 +61,6 @@ function Campo({
   onChangeText: (t: string) => void
   placeholder?: string
   keyboardType?: any
-  opcional?: boolean
   obrigatorio?: boolean
   multiline?: boolean
   erro?: boolean
@@ -70,16 +69,7 @@ function Campo({
     <View style={styles.campoWrapper}>
       <View style={styles.campoLabelRow}>
         <Text style={styles.campoLabel}>{label}</Text>
-        {opcional && (
-          <View style={styles.tagOpcional}>
-            <Text style={styles.tagOpcionalTexto}>opcional</Text>
-          </View>
-        )}
-        {obrigatorio && (
-          <View style={styles.tagObrigatorio}>
-            <Text style={styles.tagObrigatorioTexto}>obrigatório</Text>
-          </View>
-        )}
+        {obrigatorio && <Text style={styles.asterisco}>*</Text>}
       </View>
       <TextInput
         style={[styles.input, multiline && styles.inputMultiline, erro && styles.inputErro]}
@@ -143,7 +133,12 @@ export default function Exames() {
         .single()
       if (perfil) {
         setPerfilNome(perfil.nome ?? '')
-        setPerfilFoto(perfil.foto_url ?? null)
+        if (perfil.foto_url) {
+          const url = perfil.foto_url.includes('?') ? perfil.foto_url : `${perfil.foto_url}?t=${Date.now()}`
+          setPerfilFoto(url)
+        } else {
+          setPerfilFoto(null)
+        }
       }
 
       await buscar(user.id)
@@ -269,13 +264,22 @@ export default function Exames() {
         {/* Card 1 — Perfil + Logo */}
         <View style={styles.cardPerfil}>
           <View style={styles.cardPerfilConteudo}>
-            {perfilFoto ? (
-              <Image source={{ uri: perfilFoto }} style={styles.fotoPerfil} />
-            ) : (
-              <View style={styles.fotoPerfilPlaceholder}>
-                <Feather name="user" size={28} color="#9163CB" />
-              </View>
-            )}
+            <TouchableOpacity
+              onPress={() => router.push('/modulos/perfil' as any)}
+              activeOpacity={0.85}
+            >
+              {perfilFoto ? (
+                <Image
+                  source={{ uri: perfilFoto }}
+                  style={styles.fotoPerfil}
+                  onError={() => setPerfilFoto(null)}
+                />
+              ) : (
+                <View style={styles.fotoPerfilPlaceholder}>
+                  <Feather name="user" size={28} color="#9163CB" />
+                </View>
+              )}
+            </TouchableOpacity>
             <View style={styles.logoArea}>
               <Image
                 source={require('../../assets/images/logo.png')}
@@ -406,7 +410,6 @@ export default function Exames() {
                 erro={erros.nome}
               />
 
-
               <View style={styles.duasColunas}>
                 <View style={[styles.coluna, { flex: 1 }]}>
                   <Campo
@@ -426,7 +429,6 @@ export default function Exames() {
                     onChangeText={(t) => setDataResultado(mascaraData(t))}
                     placeholder="DD/MM/AAAA"
                     keyboardType="numeric"
-                    opcional
                   />
                 </View>
               </View>
@@ -436,16 +438,13 @@ export default function Exames() {
                 value={local}
                 onChangeText={setLocal}
                 placeholder="Ex: Laboratório Central"
-                opcional
               />
-
 
               <Campo
                 label="URL DO ARQUIVO"
                 value={arquivoUrl}
                 onChangeText={setArquivoUrl}
                 placeholder="https://..."
-                opcional
                 keyboardType="url"
               />
 
@@ -565,9 +564,6 @@ const styles = StyleSheet.create({
   cardIconeBox: { width: 46, height: 46, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
   cardTextos: { flex: 1, gap: 4 },
   cardNome: { fontSize: 16, fontWeight: '700', color: '#301971' },
-  cardSubtitulo: { fontSize: 13, color: '#6B49AD', fontWeight: '600' },
-  tagStatus: { alignSelf: 'flex-start', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 },
-  tagStatusTexto: { fontSize: 12, fontWeight: '700' },
   cardAcoes: { flexDirection: 'row', gap: 8 },
   btnEditar: {
     width: 38, height: 38, borderRadius: 12,
@@ -609,21 +605,9 @@ const styles = StyleSheet.create({
   coluna: { flex: 1 },
 
   campoWrapper: { marginBottom: 18 },
-  campoLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  campoLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 8 },
   campoLabel: { fontSize: 11, fontWeight: '700', color: '#9163CB', letterSpacing: 1.2 },
-
-  tagOpcional: {
-    backgroundColor: '#EDE8FA', borderRadius: 20,
-    paddingHorizontal: 10, paddingVertical: 3,
-    borderWidth: 1, borderColor: '#C4B5FD',
-  },
-  tagOpcionalTexto: { fontSize: 10, fontWeight: '700', color: '#7C3AED', letterSpacing: 0.5 },
-  tagObrigatorio: {
-    backgroundColor: '#FFF1F2', borderRadius: 20,
-    paddingHorizontal: 10, paddingVertical: 3,
-    borderWidth: 1, borderColor: '#FECACA',
-  },
-  tagObrigatorioTexto: { fontSize: 10, fontWeight: '700', color: '#dc2626', letterSpacing: 0.5 },
+  asterisco: { fontSize: 14, fontWeight: '800', color: '#481d94', lineHeight: 16 },
 
   input: {
     borderWidth: 1.5, borderColor: '#C4B5FD', borderRadius: 50,
@@ -639,16 +623,6 @@ const styles = StyleSheet.create({
 
   erroRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6, marginLeft: 16 },
   erroTexto: { fontSize: 12, color: '#dc2626', fontWeight: '600' },
-
-  seletorRow: { flexDirection: 'row', gap: 8 },
-  seletorOpcao: {
-    flex: 1, paddingVertical: 13, borderRadius: 50,
-    borderWidth: 1.5, borderColor: '#C4B5FD',
-    alignItems: 'center', backgroundColor: '#FAFAFE',
-  },
-  seletorOpcaoAtiva: { backgroundColor: '#EDE8FA', borderColor: '#6B49AD' },
-  seletorTexto: { fontSize: 13, fontWeight: '600', color: '#9163CB' },
-  seletorTextoAtivo: { color: '#301971', fontWeight: '800' },
 
   botaoSalvarWrapper: {
     marginTop: 8,
