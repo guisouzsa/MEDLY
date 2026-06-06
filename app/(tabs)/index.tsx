@@ -8,8 +8,8 @@ import {
   TouchableOpacity, View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { supabase } from '../../src/lib/supabase'
 import { getEventsForDate, getProximoLembrete } from '../../src/lib/events'
+import { supabase } from '../../src/lib/supabase'
 
 const { width } = Dimensions.get('window')
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
