@@ -54,10 +54,6 @@ export default function TabsLayout() {
           tabBarIcon: ({ color }) => <Feather name="calendar" size={24} color={color} />,
         }}
       />
-      <Tabs.Screen
-        name="dashboard"
-        options={{ href: null }}
-      />
     </Tabs>
   )
 }

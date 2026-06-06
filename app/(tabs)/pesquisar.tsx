@@ -1,7 +1,10 @@
 import { Feather } from '@expo/vector-icons'
-import { useEffect, useState } from 'react'
+import { LinearGradient } from 'expo-linear-gradient'
+import { router, useFocusEffect } from 'expo-router'
+import { useCallback, useState } from 'react'
 import {
-    ActivityIndicator, Modal,
+    ActivityIndicator,
+    Image,
     ScrollView,
     StyleSheet, Text,
     TextInput, TouchableOpacity, View
@@ -39,81 +42,146 @@ export default function Pesquisar() {
   const [filtro, setFiltro] = useState<Filtro>('todos')
   const [itens, setItens] = useState<Item[]>([])
   const [carregando, setCarregando] = useState(false)
-  const [modalFiltro, setModalFiltro] = useState(false)
+  const [perfilFoto, setPerfilFoto] = useState<string | null>(null)
 
-  useEffect(() => { carregar() }, [filtro])
+  useFocusEffect(
+    useCallback(() => {
+      async function carregarDados() {
+        setCarregando(true)
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          router.replace('/auth')
+          return
+        }
 
-  async function carregar() {
-    setCarregando(true)
-    const resultado: Item[] = []
+        try {
+          // 1. Carrega Perfil
+          const { data: perfil } = await supabase
+            .from('perfis')
+            .select('foto_url')
+            .eq('id', user.id)
+            .single()
+          if (perfil) {
+            if (perfil.foto_url) {
+              const url = perfil.foto_url.includes('?') ? perfil.foto_url : `${perfil.foto_url}?t=${Date.now()}`
+              setPerfilFoto(url)
+            } else {
+              setPerfilFoto(null)
+            }
+          }
 
-    if (filtro === 'todos' || filtro === 'medicamentos') {
-      const { data } = await supabase.from('medicamentos').select('id, nome, dosagem, horario, status')
-      data?.forEach(m => resultado.push({
-        id: m.id, tipo: 'medicamentos',
-        titulo: m.nome,
-        subtitulo: [m.dosagem, m.horario, m.status].filter(Boolean).join(' · '),
-        icone: 'activity',
-      }))
-    }
+          // 2. Carrega Dados
+          const resultado: Item[] = []
 
-    if (filtro === 'todos' || filtro === 'consultas') {
-      const { data } = await supabase.from('consultas').select('id, especialidade, nome_medico, data, horario, local')
-      data?.forEach(c => {
-        const dataFormatada = (() => {
-          if (!c.data) return ''
-          const parts = c.data.split('-')
-          if (parts.length < 3) return c.data
-          return `${parts[2]}/${parts[1]}/${parts[0]}`
-        })()
-        const dataHora = [dataFormatada, c.horario].filter(Boolean).join(' às ')
-        resultado.push({
-          id: c.id, tipo: 'consultas',
-          titulo: c.especialidade,
-          subtitulo: [c.nome_medico, dataHora, c.local].filter(Boolean).join(' · '),
-          icone: 'calendar',
-        })
-      })
-    }
+          if (filtro === 'todos' || filtro === 'medicamentos') {
+            const { data } = await supabase.from('medicamentos').select('id, nome, dosagem, horario, status').eq('usuario_id', user.id)
+            data?.forEach(m => resultado.push({
+              id: m.id, tipo: 'medicamentos',
+              titulo: m.nome,
+              subtitulo: [m.dosagem, m.horario, m.status].filter(Boolean).join(' · '),
+              icone: 'activity',
+            }))
+          }
 
-    if (filtro === 'todos' || filtro === 'sintomas') {
-      const { data } = await supabase.from('sintomas').select('id, nome, intensidade, data')
-      data?.forEach(s => resultado.push({
-        id: s.id, tipo: 'sintomas',
-        titulo: s.nome,
-        subtitulo: [`Intensidade ${s.intensidade}/10`, s.data].filter(Boolean).join(' · '),
-        icone: 'thermometer',
-      }))
-    }
+          if (filtro === 'todos' || filtro === 'consultas') {
+            const { data } = await supabase.from('consultas').select('id, especialidade, nome_medico, data, horario, local').eq('usuario_id', user.id)
+            data?.forEach(c => {
+              const dataFormatada = (() => {
+                if (!c.data) return ''
+                const parts = c.data.split('-')
+                if (parts.length < 3) return c.data
+                return `${parts[2]}/${parts[1]}/${parts[0]}`
+              })()
+              const dataHora = [dataFormatada, c.horario].filter(Boolean).join(' às ')
+              resultado.push({
+                id: c.id, tipo: 'consultas',
+                titulo: c.especialidade,
+                subtitulo: [c.nome_medico, dataHora, c.local].filter(Boolean).join(' · '),
+                icone: 'calendar',
+              })
+            })
+          }
 
-    if (filtro === 'todos' || filtro === 'exames') {
-      const { data } = await supabase.from('exames').select('id, nome, data_realizacao, status')
-      data?.forEach(e => resultado.push({
-        id: e.id, tipo: 'exames',
-        titulo: e.nome,
-        subtitulo: [e.data_realizacao, e.status].filter(Boolean).join(' · '),
-        icone: 'file-text',
-      }))
-    }
+          if (filtro === 'todos' || filtro === 'sintomas') {
+            const { data } = await supabase.from('sintomas').select('id, nome, intensidade, data').eq('usuario_id', user.id)
+            data?.forEach(s => {
+              const dataFormatada = (() => {
+                if (!s.data) return ''
+                const parts = s.data.split('-')
+                if (parts.length < 3) return s.data
+                return `${parts[2]}/${parts[1]}/${parts[0]}`
+              })()
+              resultado.push({
+                id: s.id, tipo: 'sintomas',
+                titulo: s.nome,
+                subtitulo: [`Intensidade ${s.intensidade}/10`, dataFormatada].filter(Boolean).join(' · '),
+                icone: 'thermometer',
+              })
+            })
+          }
 
-    setItens(resultado)
-    setCarregando(false)
-  }
+          if (filtro === 'todos' || filtro === 'exames') {
+            const { data } = await supabase.from('exames').select('id, nome, data_realizacao, status').eq('usuario_id', user.id)
+            data?.forEach(e => {
+              const dataFormatada = (() => {
+                if (!e.data_realizacao) return ''
+                const parts = e.data_realizacao.split('-')
+                if (parts.length < 3) return e.data_realizacao
+                return `${parts[2]}/${parts[1]}/${parts[0]}`
+              })()
+              resultado.push({
+                id: e.id, tipo: 'exames',
+                titulo: e.nome,
+                subtitulo: [dataFormatada, e.status].filter(Boolean).join(' · '),
+                icone: 'file-text',
+              })
+            })
+          }
+
+          setItens(resultado)
+        } catch (err) {
+          console.error('Erro ao carregar dados de pesquisa:', err)
+        } finally {
+          setCarregando(false)
+        }
+      }
+      carregarDados()
+    }, [filtro])
+  )
 
   const itensFiltrados = itens.filter(item =>
     item.titulo.toLowerCase().includes(busca.toLowerCase()) ||
     item.subtitulo.toLowerCase().includes(busca.toLowerCase())
   )
 
-  const filtroAtual = FILTROS.find(f => f.valor === filtro)
-
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* Card 1 — Perfil + Logo */}
+        <View style={styles.cardPerfil}>
+          <TouchableOpacity onPress={() => router.push('/modulos/perfil' as any)} activeOpacity={0.85}>
+            {perfilFoto ? (
+              <Image source={{ uri: perfilFoto }} style={styles.fotoPerfil} onError={() => setPerfilFoto(null)} />
+            ) : (
+              <View style={styles.fotoPerfilPlaceholder}>
+                <Feather name="user" size={24} color="#9163CB" />
+              </View>
+            )}
+          </TouchableOpacity>
+          <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
+          <View style={{ width: 44 }} />
+        </View>
 
-      <View style={styles.header}>
-        <Text style={styles.headerTitulo}>Pesquisar</Text>
-        <Text style={styles.headerSub}>Busque em todos os seus registros</Text>
+        {/* Card 2 — Título */}
+        <LinearGradient
+          colors={['#6B49AD', '#6843B1', '#481D94']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          style={styles.cardTituloLista}
+        >
+          <Text style={styles.cardTituloTexto}>PESQUISAS</Text>
+        </LinearGradient>
 
+        {/* Caixa de pesquisa */}
         <View style={styles.inputBox}>
           <Feather name="search" size={20} color="#9163CB" />
           <TextInput
@@ -131,16 +199,31 @@ export default function Pesquisar() {
           )}
         </View>
 
-        <TouchableOpacity style={styles.botaoFiltro} onPress={() => setModalFiltro(true)} activeOpacity={0.8}>
-          <Feather name={filtroAtual?.icone as any} size={16} color="#6B49AD" />
-          <Text style={styles.botaoFiltroTexto}>{filtroAtual?.label}</Text>
-          <Feather name="chevron-down" size={16} color="#6B49AD" />
-        </TouchableOpacity>
-      </View>
+        {/* Filtros em linha horizontal scrollable */}
+        <View style={styles.filtrosContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtrosScroll}>
+            {FILTROS.map((f) => {
+              const ativo = filtro === f.valor
+              return (
+                <TouchableOpacity
+                  key={f.valor}
+                  onPress={() => setFiltro(f.valor)}
+                  activeOpacity={0.8}
+                  style={[styles.filtroPil, ativo && styles.filtroPilAtivo]}
+                >
+                  <Feather name={f.icone as any} size={13} color={ativo ? '#fff' : '#6B49AD'} />
+                  <Text style={[styles.filtroPilTexto, ativo && styles.filtroPilTextoAtivo]}>
+                    {f.label}
+                  </Text>
+                </TouchableOpacity>
+              )
+            })}
+          </ScrollView>
+        </View>
 
-      <ScrollView contentContainerStyle={styles.lista} showsVerticalScrollIndicator={false}>
+        {/* Lista de Resultados */}
         {carregando ? (
-          <ActivityIndicator size="large" color="#6B49AD" style={{ marginTop: 60 }} />
+          <ActivityIndicator size="large" color="#6B49AD" style={{ marginTop: 40 }} />
         ) : itensFiltrados.length === 0 ? (
           <View style={styles.vazioContainer}>
             <View style={styles.vazioIcone}>
@@ -150,60 +233,34 @@ export default function Pesquisar() {
             <Text style={styles.vazioSub}>Tente outros termos ou filtros</Text>
           </View>
         ) : (
-          itensFiltrados.map((item, i) => {
-            const cor = COR_TIPO[item.tipo]
-            return (
-              <View key={`${item.tipo}-${item.id}-${i}`} style={styles.card}>
-                <View style={[styles.cardIconeBox, { backgroundColor: cor.bg }]}>
-                  <Feather name={item.icone as any} size={22} color={cor.cor} />
-                </View>
-                <View style={styles.cardTextos}>
-                  <View style={styles.cardTopo}>
-                    <Text style={styles.cardTitulo}>{item.titulo}</Text>
-                    <View style={[styles.tagTipo, { backgroundColor: cor.bg }]}>
-                      <Text style={[styles.tagTipoTexto, { color: cor.cor }]}>
-                        {item.tipo.charAt(0).toUpperCase() + item.tipo.slice(1, -1)}
-                      </Text>
-                    </View>
+          <View style={styles.lista}>
+            {itensFiltrados.map((item, i) => {
+              const cor = COR_TIPO[item.tipo]
+              return (
+                <View key={`${item.tipo}-${item.id}-${i}`} style={styles.card}>
+                  <View style={[styles.cardIconeBox, { backgroundColor: cor.bg }]}>
+                    <Feather name={item.icone as any} size={22} color={cor.cor} />
                   </View>
-                  {item.subtitulo ? (
-                    <Text style={styles.cardSub}>{item.subtitulo}</Text>
-                  ) : null}
+                  <View style={styles.cardTextos}>
+                    <View style={styles.cardTopo}>
+                      <Text style={styles.cardTitulo} numberOfLines={1}>{item.titulo}</Text>
+                      <View style={[styles.tagTipo, { backgroundColor: cor.bg }]}>
+                        <Text style={[styles.tagTipoTexto, { color: cor.cor }]}>
+                          {item.tipo.charAt(0).toUpperCase() + item.tipo.slice(1, -1)}
+                        </Text>
+                      </View>
+                    </View>
+                    {item.subtitulo ? (
+                      <Text style={styles.cardSub}>{item.subtitulo}</Text>
+                    ) : null}
+                  </View>
                 </View>
-              </View>
-            )
-          })
+              )
+            })}
+          </View>
         )}
         <View style={{ height: 100 }} />
       </ScrollView>
-
-      <Modal visible={modalFiltro} transparent animationType="fade">
-        <TouchableOpacity
-          style={styles.modalFundo}
-          activeOpacity={1}
-          onPress={() => setModalFiltro(false)}
-        >
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitulo}>Filtrar por tipo</Text>
-            {FILTROS.map((f) => (
-              <TouchableOpacity
-                key={f.valor}
-                style={[styles.modalOpcao, filtro === f.valor && styles.modalOpcaoAtiva]}
-                onPress={() => { setFiltro(f.valor); setModalFiltro(false) }}
-              >
-                <View style={[styles.modalOpcaoIcone, filtro === f.valor && styles.modalOpcaoIconeAtivo]}>
-                  <Feather name={f.icone as any} size={20} color={filtro === f.valor ? '#fff' : '#6B49AD'} />
-                </View>
-                <Text style={[styles.modalOpcaoTexto, filtro === f.valor && styles.modalOpcaoTextoAtivo]}>
-                  {f.label}
-                </Text>
-                {filtro === f.valor && <Feather name="check" size={18} color="#6B49AD" />}
-              </TouchableOpacity>
-            ))}
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
     </SafeAreaView>
   )
 }
@@ -213,49 +270,87 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F5F0FF',
   },
-  header: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    shadowColor: '#6B49AD',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 6,
-    gap: 12,
+  scroll: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
   },
-  headerTitulo: { fontSize: 24, fontWeight: '800', color: '#301971' },
-  headerSub: { fontSize: 14, color: '#9163CB', marginTop: -6 },
+  cardPerfil: {
+    backgroundColor: '#fff', marginHorizontal: 0, marginTop: 0,
+    borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1, shadowRadius: 12, elevation: 5,
+    marginBottom: 14,
+  },
+  fotoPerfil: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#E2D9F3' },
+  fotoPerfilPlaceholder: {
+    width: 44, height: 44, borderRadius: 22, backgroundColor: '#EDE8FA',
+    justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#E2D9F3',
+  },
+  logo: { width: 110, height: 36 },
+  
+  cardTituloLista: {
+    marginHorizontal: 0, marginTop: 0, borderRadius: 50,
+    paddingVertical: 14, alignItems: 'center',
+    shadowColor: '#481D94', shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2, shadowRadius: 8, elevation: 5,
+    marginBottom: 20,
+  },
+  cardTituloTexto: { fontSize: 14, fontWeight: '800', color: '#fff', letterSpacing: 3 },
 
   inputBox: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: '#F5F0FF', borderRadius: 16,
+    backgroundColor: '#fff', borderRadius: 20,
     paddingHorizontal: 16, paddingVertical: 14,
     borderWidth: 1.5, borderColor: '#E2D9F3',
+    shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.05, shadowRadius: 8, elevation: 3,
+    marginBottom: 16,
   },
   input: { flex: 1, fontSize: 16, color: '#301971' },
 
-  botaoFiltro: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    alignSelf: 'flex-start',
-    backgroundColor: '#EDE8FA', borderRadius: 20,
-    paddingHorizontal: 16, paddingVertical: 10,
+  filtrosContainer: {
+    marginBottom: 20,
+    marginHorizontal: -16,
   },
-  botaoFiltroTexto: { fontSize: 14, fontWeight: '700', color: '#301971' },
+  filtrosScroll: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  filtroPil: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: '#E2D9F3',
+    borderRadius: 50,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  filtroPilAtivo: {
+    backgroundColor: '#6B49AD',
+    borderColor: '#6B49AD',
+  },
+  filtroPilTexto: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#6B49AD',
+  },
+  filtroPilTextoAtivo: {
+    color: '#fff',
+  },
 
-  lista: { padding: 16, gap: 12 },
+  lista: { gap: 12 },
 
-  vazioContainer: { alignItems: 'center', marginTop: 80, gap: 12 },
+  vazioContainer: { alignItems: 'center', marginTop: 40, gap: 12 },
   vazioIcone: {
-    width: 90, height: 90, borderRadius: 28,
+    width: 76, height: 76, borderRadius: 24,
     backgroundColor: '#EDE8FA',
-    justifyContent: 'center', alignItems: 'center', marginBottom: 8,
+    justifyContent: 'center', alignItems: 'center', marginBottom: 4,
   },
-  vazioTitulo: { fontSize: 18, fontWeight: '700', color: '#301971' },
-  vazioSub: { fontSize: 15, color: '#9163CB' },
+  vazioTitulo: { fontSize: 17, fontWeight: '700', color: '#301971' },
+  vazioSub: { fontSize: 14, color: '#9163CB' },
 
   card: {
     backgroundColor: '#fff', borderRadius: 20,
@@ -275,29 +370,6 @@ const styles = StyleSheet.create({
   tagTipo: {
     borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4,
   },
-  tagTipoTexto: { fontSize: 12, fontWeight: '700' },
+  tagTipoTexto: { fontSize: 11, fontWeight: '700' },
   cardSub: { fontSize: 13, color: '#6B49AD' },
-
-  modalFundo: {
-    flex: 1, backgroundColor: '#00000055',
-    justifyContent: 'center', paddingHorizontal: 32,
-  },
-  modalCard: {
-    backgroundColor: '#fff', borderRadius: 24,
-    padding: 24, gap: 8,
-  },
-  modalTitulo: { fontSize: 18, fontWeight: '800', color: '#301971', marginBottom: 8 },
-  modalOpcao: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    padding: 14, borderRadius: 16,
-  },
-  modalOpcaoAtiva: { backgroundColor: '#F0EAFF' },
-  modalOpcaoIcone: {
-    width: 40, height: 40, borderRadius: 12,
-    backgroundColor: '#EDE8FA',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  modalOpcaoIconeAtivo: { backgroundColor: '#6B49AD' },
-  modalOpcaoTexto: { flex: 1, fontSize: 16, fontWeight: '600', color: '#301971' },
-  modalOpcaoTextoAtivo: { fontWeight: '800' },
 })
