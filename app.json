@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "medly",
+    "name": "Medly",
     "slug": "medly",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -12,13 +12,15 @@
       "supportsTablet": true
     },
     "android": {
-      "package": "com.medly.app",
       "adaptiveIcon": {
+        "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.raquellll.medly"
     },
     "web": {
       "output": "static",
@@ -62,7 +64,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "37e3a664-b4da-4826-b155-8b7d4bd95ae1"
+        "projectId": "91a8fe06-b082-4913-b2fc-b261e3ecb277"
       }
     }
   }
