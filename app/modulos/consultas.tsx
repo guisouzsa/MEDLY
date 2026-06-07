@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import ModalAlerta from '../../src/components/ModalAlerta'
 import { salvarHistorico } from '../../src/lib/events'
+import { reagendarTodasNotificacoes } from '../../src/lib/notifications'
 import { supabase } from '../../src/lib/supabase'
 
 const { height } = Dimensions.get('window')
@@ -430,6 +431,7 @@ export default function Consultas() {
             }
             fecharModal()
             await buscar()
+            await reagendarTodasNotificacoes(usuarioId)
             setModalSucesso({
                 visivel: true,
                 titulo: editando ? 'Consulta atualizada!' : 'Consulta cadastrada!',
@@ -460,6 +462,7 @@ export default function Consultas() {
         setModalExcluir(false)
         setExcluirId(null)
         await buscar()
+        await reagendarTodasNotificacoes(usuarioId!)
         setModalSucesso({
             visivel: true,
             titulo: 'Consulta excluída!',

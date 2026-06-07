@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import ModalAlerta from '../../src/components/ModalAlerta'
 import { salvarHistorico } from '../../src/lib/events'
+import { reagendarTodasNotificacoes } from '../../src/lib/notifications'
 import { supabase } from '../../src/lib/supabase'
 
 const { height } = Dimensions.get('window')
@@ -664,6 +665,7 @@ export default function Medicamentos() {
 
       fecharModal()
       await buscar()
+      await reagendarTodasNotificacoes(usuarioId)
       setModalSucesso({
         visivel: true,
         titulo: editando ? 'Medicamento atualizado!' : 'Medicamento cadastrado!',
@@ -687,6 +689,7 @@ export default function Medicamentos() {
     if (med) await salvarHistorico(usuarioId!, `Medicamento ${med.nome} foi removido`)
     setModalExcluir(false); setExcluirId(null)
     await buscar()
+    await reagendarTodasNotificacoes(usuarioId!)
     setModalSucesso({
       visivel: true,
       titulo: 'Medicamento excluído!',

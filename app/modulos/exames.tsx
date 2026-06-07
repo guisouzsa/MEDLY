@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import ModalAlerta from '../../src/components/ModalAlerta'
 import { supabase } from '../../src/lib/supabase'
 import { salvarHistorico } from '../../src/lib/events'
+import { reagendarTodasNotificacoes } from '../../src/lib/notifications'
 
 const { height, width } = Dimensions.get('window')
 
@@ -632,6 +633,7 @@ export default function Exames() {
 
       fecharModal()
       await buscar()
+      await reagendarTodasNotificacoes().catch(console.error)
       setModalSucesso({
         visivel: true,
         titulo: editando ? 'Exame atualizado!' : 'Exame cadastrado!',
@@ -660,6 +662,7 @@ export default function Exames() {
     setModalExcluir(false)
     setExcluirId(null)
     await buscar()
+    await reagendarTodasNotificacoes().catch(console.error)
     setModalSucesso({
       visivel: true,
       titulo: 'Exame excluído!',
