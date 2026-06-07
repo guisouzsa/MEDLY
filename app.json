@@ -1,6 +1,16 @@
 {
   "expo": {
+    "name": "medly",
+    "slug": "medly",
+    "version": "1.0.0",
+    "orientation": "portrait",
     "icon": "./assets/images/adaptive-icon.png",
+    "scheme": "appidosos",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true
+    },
     "android": {
       "package": "com.medly.app",
       "adaptiveIcon": {
@@ -9,6 +19,10 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       "expo-router",
@@ -30,42 +44,26 @@
           "icon": "./assets/images/logonotificacoes.png",
           "color": "#6B49AD"
         }
-      ]
-    ]
-  }
-}{
-  "expo": {
-    "icon": "./assets/images/adaptive-icon.png",
-    "android": {
-      "package": "com.medly.app",
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
-      },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
-    },
-    "plugins": [
-      "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
-          "dark": {
-            "backgroundColor": "#000000"
-          }
-        }
       ],
       [
-        "expo-notifications",
+        "expo-image-picker",
         {
-          "icon": "./assets/images/logonotificacoes.png",
-          "color": "#6B49AD"
+          "photosPermission": "Permita que o MEDLY acesse suas fotos para selecionar sua foto de perfil."
         }
       ]
-    ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "updates": {
+      "enabled": false
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "37e3a664-b4da-4826-b155-8b7d4bd95ae1"
+      }
+    }
   }
 }
