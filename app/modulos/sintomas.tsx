@@ -166,6 +166,125 @@ function PainScale({ value, onChange }: { value: number, onChange: (v: number) =
     )
 }
 
+// ─── Card de sintoma colapsável ───────────────────────────────────────────────
+
+function CardSintoma({
+    sint,
+    onEditar,
+    onExcluir,
+}: {
+    sint: Sintoma
+    onEditar: () => void
+    onExcluir: () => void
+}) {
+    const [expandido, setExpandido] = useState(false)
+    const pain = PAIN_SCALE[sint.intensidade]
+
+    // Ver mais só aparece se tiver horário, duração ou observações
+    const temDetalhes = !!(sint.horario || sint.duracao || sint.observacoes)
+
+    return (
+        <View style={styles.card}>
+            {/* Topo sempre visível */}
+            <View style={styles.cardTopo}>
+                <View style={[styles.cardIconeBox, { backgroundColor: pain.roxo }]}>
+                    <Text style={styles.cardEmoji}>{pain.emoji}</Text>
+                </View>
+                <View style={styles.cardTextos}>
+                    <Text style={styles.cardNome}>{sint.nome}</Text>
+                </View>
+                <View style={styles.cardAcoes}>
+                    <TouchableOpacity style={styles.btnEditar} onPress={onEditar}>
+                        <Feather name="edit-2" size={17} color="#6B49AD" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.btnExcluirCard} onPress={onExcluir}>
+                        <Feather name="trash-2" size={17} color="#dc2626" />
+                    </TouchableOpacity>
+                </View>
+            </View>
+
+            <View style={styles.cardDivisor} />
+
+            {/* Infos sempre visíveis */}
+            <View style={styles.cardInfos}>
+                {/* Badge de intensidade — estilo badge Próxima/Realizada */}
+                <View style={[
+                    styles.badgeIntensidade,
+                    { backgroundColor: pain.roxo },
+                ]}>
+                    <Feather
+                        name="activity"
+                        size={11}
+                        color={sint.intensidade <= 3 ? '#481D94' : '#fff'}
+                    />
+                    <Text style={[
+                        styles.badgeIntensidadeTexto,
+                        { color: sint.intensidade <= 3 ? '#481D94' : '#fff' },
+                    ]}>
+                        {sint.intensidade}/10 — {pain.label}
+                    </Text>
+                </View>
+
+                {/* Data — sempre visível */}
+                <View style={styles.infoLinha}>
+                    <Feather name="calendar" size={15} color="#6B49AD" />
+                    <Text style={styles.infoLinhaLabel}>Data</Text>
+                    <Text style={styles.infoLinhaTexto}>{formatarDataParaTela(sint.data)}</Text>
+                </View>
+
+                {/* Gatilho — visível quando preenchido, fora do ver mais */}
+                {sint.gatilho ? (
+                    <View style={styles.infoLinha}>
+                        <Feather name="zap" size={15} color="#6B49AD" />
+                        <Text style={styles.infoLinhaLabel}>Gatilho</Text>
+                        <Text style={styles.infoLinhaTexto}>{sint.gatilho}</Text>
+                    </View>
+                ) : null}
+            </View>
+
+            {/* Detalhes expandidos: horário, duração, observações */}
+            {expandido && temDetalhes && (
+                <View style={styles.cardDetalhes}>
+                    <View style={styles.cardDivisor} />
+                    {sint.horario ? (
+                        <View style={styles.infoLinha}>
+                            <Feather name="clock" size={15} color="#6B49AD" />
+                            <Text style={styles.infoLinhaLabel}>Horário</Text>
+                            <Text style={styles.infoLinhaTexto}>{sint.horario.slice(0, 5)}</Text>
+                        </View>
+                    ) : null}
+                    {sint.duracao ? (
+                        <View style={styles.infoLinha}>
+                            <Feather name="watch" size={15} color="#6B49AD" />
+                            <Text style={styles.infoLinhaLabel}>Duração</Text>
+                            <Text style={styles.infoLinhaTexto}>{sint.duracao}</Text>
+                        </View>
+                    ) : null}
+                    {sint.observacoes ? (
+                        <View style={[styles.infoLinha, { alignItems: 'flex-start' }]}>
+                            <Feather name="file-text" size={15} color="#6B49AD" style={{ marginTop: 2 }} />
+                            <Text style={styles.infoLinhaLabel}>Obs.</Text>
+                            <Text style={[styles.infoLinhaTexto, { flex: 1 }]}>{sint.observacoes}</Text>
+                        </View>
+                    ) : null}
+                </View>
+            )}
+
+            {/* Botão ver mais / ver menos — só se tiver horário, duração ou observações */}
+            {temDetalhes && (
+                <TouchableOpacity
+                    onPress={() => setExpandido(e => !e)}
+                    activeOpacity={0.7}
+                    style={styles.verMaisBtn}
+                >
+                    <Text style={styles.verMaisTexto}>{expandido ? 'Ver menos' : 'Ver mais'}</Text>
+                    <Feather name={expandido ? 'chevron-up' : 'chevron-down'} size={14} color="#6B49AD" />
+                </TouchableOpacity>
+            )}
+        </View>
+    )
+}
+
 export default function Sintomas() {
     const { action } = useLocalSearchParams()
     const [usuarioId, setUsuarioId] = useState<string | null>(null)
@@ -328,7 +447,6 @@ export default function Sintomas() {
         })
     }
 
-    // ordem: Hoje → Semana → Todos
     const filtroLabels: Record<Filtro, string> = { hoje: 'Hoje', semana: 'Semana', todos: 'Todos' }
     const filtroOrdem: Filtro[] = ['hoje', 'semana', 'todos']
     const listaFiltrada = filtrarPorPeriodo(lista, filtro)
@@ -363,7 +481,7 @@ export default function Sintomas() {
                     <Text style={styles.cardTituloTexto}>SINTOMAS</Text>
                 </LinearGradient>
 
-                {/* Filtros — ordem: Hoje → Semana → Todos */}
+                {/* Filtros */}
                 <View style={styles.filtrosRow}>
                     {filtroOrdem.map((f) => (
                         <TouchableOpacity
@@ -404,75 +522,14 @@ export default function Sintomas() {
                             <Text style={styles.vazioSub}>Toque em "+" para adicionar</Text>
                         </View>
                     ) : (
-                        listaFiltrada.map((sint) => {
-                            const pain = PAIN_SCALE[sint.intensidade]
-                            return (
-                                <View key={sint.id} style={styles.card}>
-                                    <View style={styles.cardTopo}>
-                                        <View style={[styles.cardIconeBox, { backgroundColor: pain.roxo }]}>
-                                            <Text style={styles.cardEmoji}>{pain.emoji}</Text>
-                                        </View>
-                                        <View style={styles.cardTextos}>
-                                            <Text style={styles.cardNome}>{sint.nome}</Text>
-                                            <View style={[styles.tagIntensidade, { backgroundColor: pain.roxo }]}>
-                                                <Text style={[
-                                                    styles.tagIntensidadeTexto,
-                                                    { color: sint.intensidade <= 3 ? '#481D94' : '#fff' }
-                                                ]}>
-                                                    {sint.intensidade}/10 — {pain.label}
-                                                </Text>
-                                            </View>
-                                        </View>
-                                        <View style={styles.cardAcoes}>
-                                            <TouchableOpacity style={styles.btnEditar} onPress={() => abrirModal(sint)}>
-                                                <Feather name="edit-2" size={17} color="#6B49AD" />
-                                            </TouchableOpacity>
-                                            <TouchableOpacity style={styles.btnExcluirCard} onPress={() => confirmarExcluir(sint.id)}>
-                                                <Feather name="trash-2" size={17} color="#dc2626" />
-                                            </TouchableOpacity>
-                                        </View>
-                                    </View>
-
-                                    <View style={styles.cardDivisor} />
-
-                                    <View style={styles.cardInfos}>
-                                        <View style={styles.infoLinha}>
-                                            <Feather name="calendar" size={15} color="#6B49AD" />
-                                            <Text style={styles.infoLinhaLabel}>Data</Text>
-                                            <Text style={styles.infoLinhaTexto}>{formatarDataParaTela(sint.data)}</Text>
-                                        </View>
-                                        {sint.horario ? (
-                                            <View style={styles.infoLinha}>
-                                                <Feather name="clock" size={15} color="#6B49AD" />
-                                                <Text style={styles.infoLinhaLabel}>Horário</Text>
-                                                <Text style={styles.infoLinhaTexto}>{sint.horario.slice(0, 5)}</Text>
-                                            </View>
-                                        ) : null}
-                                        {sint.duracao ? (
-                                            <View style={styles.infoLinha}>
-                                                <Feather name="watch" size={15} color="#6B49AD" />
-                                                <Text style={styles.infoLinhaLabel}>Duração</Text>
-                                                <Text style={styles.infoLinhaTexto}>{sint.duracao}</Text>
-                                            </View>
-                                        ) : null}
-                                        {sint.gatilho ? (
-                                            <View style={styles.infoLinha}>
-                                                <Feather name="zap" size={15} color="#6B49AD" />
-                                                <Text style={styles.infoLinhaLabel}>Gatilho</Text>
-                                                <Text style={styles.infoLinhaTexto}>{sint.gatilho}</Text>
-                                            </View>
-                                        ) : null}
-                                        {sint.observacoes ? (
-                                            <View style={[styles.infoLinha, { alignItems: 'flex-start' }]}>
-                                                <Feather name="file-text" size={15} color="#6B49AD" style={{ marginTop: 2 }} />
-                                                <Text style={styles.infoLinhaLabel}>Obs.</Text>
-                                                <Text style={[styles.infoLinhaTexto, { flex: 1 }]}>{sint.observacoes}</Text>
-                                            </View>
-                                        ) : null}
-                                    </View>
-                                </View>
-                            )
-                        })
+                        listaFiltrada.map((sint) => (
+                            <CardSintoma
+                                key={sint.id}
+                                sint={sint}
+                                onEditar={() => abrirModal(sint)}
+                                onExcluir={() => confirmarExcluir(sint.id)}
+                            />
+                        ))
                     )}
                 </View>
             </ScrollView>
@@ -546,7 +603,7 @@ export default function Sintomas() {
                 </KeyboardAvoidingView>
             </Modal>
 
-            {/* Modal excluir — flutuando no centro, sem encostar em bordas */}
+            {/* Modal excluir */}
             <Modal visible={modalExcluir} transparent animationType="fade">
                 <View style={styles.modalExcluirFundo}>
                     <View style={styles.modalExcluirCard}>
@@ -565,22 +622,18 @@ export default function Sintomas() {
                 </View>
             </Modal>
 
-            {/* Modal alerta (erros) */}
             <ModalAlerta
                 visivel={modalAlerta.visivel}
                 titulo={modalAlerta.titulo}
                 mensagem={modalAlerta.mensagem}
                 onFechar={() => setModalAlerta(m => ({ ...m, visivel: false }))}
             />
-
-            {/* Modal sucesso (salvar/editar) */}
             <ModalAlerta
                 visivel={modalSucesso.visivel}
                 titulo={modalSucesso.titulo}
                 mensagem={modalSucesso.mensagem}
                 onFechar={() => setModalSucesso(m => ({ ...m, visivel: false }))}
             />
-
         </SafeAreaView>
     )
 }
@@ -663,8 +716,6 @@ const styles = StyleSheet.create({
     cardEmoji: { fontSize: 24 },
     cardTextos: { flex: 1, gap: 4 },
     cardNome: { fontSize: 16, fontWeight: '700', color: '#301971' },
-    tagIntensidade: { alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
-    tagIntensidadeTexto: { fontSize: 12, fontWeight: '700' },
     cardAcoes: { flexDirection: 'row', gap: 8 },
     btnEditar: {
         width: 38, height: 38, borderRadius: 12,
@@ -676,9 +727,26 @@ const styles = StyleSheet.create({
     },
     cardDivisor: { height: 1, backgroundColor: '#F0EAFF', marginVertical: 12 },
     cardInfos: { gap: 8 },
+    cardDetalhes: { gap: 8 },
+
+    // Badge de intensidade — mesmo padrão do badge Próxima/Realizada
+    badgeIntensidade: {
+        flexDirection: 'row', alignItems: 'center', gap: 4,
+        alignSelf: 'flex-start', borderRadius: 999,
+        paddingHorizontal: 10, paddingVertical: 4,
+    },
+    badgeIntensidadeTexto: { fontSize: 11, fontWeight: '700' },
+
     infoLinha: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     infoLinhaLabel: { fontSize: 13, fontWeight: '700', color: '#9163CB', flexShrink: 0, marginRight: 4 },
     infoLinhaTexto: { fontSize: 13, color: '#301971', fontWeight: '600', flex: 1 },
+
+    verMaisBtn: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+        gap: 4, marginTop: 10, paddingTop: 10,
+        borderTopWidth: 1, borderTopColor: '#F0EAFF',
+    },
+    verMaisTexto: { fontSize: 13, fontWeight: '700', color: '#6B49AD' },
 
     painCentro: {
         alignItems: 'center', borderRadius: 20,
@@ -740,26 +808,15 @@ const styles = StyleSheet.create({
     botaoSalvar: { borderRadius: 50, paddingVertical: 18, alignItems: 'center' },
     botaoSalvarTexto: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 2 },
 
-    // Modal excluir — flutuando no centro
     modalExcluirFundo: {
-        flex: 1,
-        backgroundColor: '#00000066',
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: 32,   // margem lateral para não encostar nas bordas
+        flex: 1, backgroundColor: '#00000066',
+        justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32,
     },
     modalExcluirCard: {
-        backgroundColor: '#fff',
-        borderRadius: 28,
-        padding: 32,
-        width: '100%',
-        alignItems: 'center',
-        gap: 12,
-        shadowColor: '#301971',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.25,
-        shadowRadius: 20,
-        elevation: 14,
+        backgroundColor: '#fff', borderRadius: 28, padding: 32,
+        width: '100%', alignItems: 'center', gap: 12,
+        shadowColor: '#301971', shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.25, shadowRadius: 20, elevation: 14,
     },
     modalExcluirIcone: {
         width: 72, height: 72, borderRadius: 24, backgroundColor: '#FFF1F2',
@@ -774,6 +831,4 @@ const styles = StyleSheet.create({
     btnExcluirConfirmarTexto: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 2 },
     btnCancelar: { paddingVertical: 12 },
     btnCancelarTexto: { fontSize: 15, fontWeight: '600', color: '#9163CB' },
-
-    // Modal roxo de confirmação pós-exclusão
 })
