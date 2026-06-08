@@ -3,11 +3,6 @@ import { StatusBar } from 'expo-status-bar'
 import { useEffect } from 'react'
 import 'react-native-reanimated'
 import { CadastroProvider } from '../src/context/CadastroContext'
-import {
-  inicializarNotificacoes,
-  pedirPermissaoNotificacoes,
-  reagendarTodasNotificacoes,
-} from '../src/lib/notifications'
 import { supabase } from '../src/lib/supabase'
 
 export default function RootLayout() {
@@ -15,11 +10,14 @@ export default function RootLayout() {
   useEffect(() => {
     async function setupNotificacoes() {
       try {
+        // Importação dinâmica para evitar crash se o módulo nativo não estiver disponível
+        const NotifLib = await import('../src/lib/notifications')
+
         // Inicializa handler, canal Android e categorias de ação
-        await inicializarNotificacoes()
+        await NotifLib.inicializarNotificacoes()
 
         // Pede permissão ao usuário
-        const permitido = await pedirPermissaoNotificacoes()
+        const permitido = await NotifLib.pedirPermissaoNotificacoes()
         if (!permitido) {
           console.log('[MEDLY] Permissão de notificações negada')
           return
@@ -28,10 +26,11 @@ export default function RootLayout() {
         // Se estiver logado, reagenda todas as notificações dos próximos 7 dias
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
-          await reagendarTodasNotificacoes(user.id)
+          await NotifLib.reagendarTodasNotificacoes(user.id)
         }
       } catch (err) {
-        console.error('[MEDLY] Erro ao configurar notificações:', err)
+        // Silencia qualquer erro de notificações para não travar o app
+        console.warn('[MEDLY] Notificações indisponíveis neste ambiente:', err)
       }
     }
 

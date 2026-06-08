@@ -665,7 +665,7 @@ export default function Medicamentos() {
 
       fecharModal()
       await buscar()
-      await reagendarTodasNotificacoes(usuarioId)
+      await reagendarTodasNotificacoes(usuarioId).catch(console.warn)
       setModalSucesso({
         visivel: true,
         titulo: editando ? 'Medicamento atualizado!' : 'Medicamento cadastrado!',
@@ -689,7 +689,7 @@ export default function Medicamentos() {
     if (med) await salvarHistorico(usuarioId!, `Medicamento ${med.nome} foi removido`)
     setModalExcluir(false); setExcluirId(null)
     await buscar()
-    await reagendarTodasNotificacoes(usuarioId!)
+    await reagendarTodasNotificacoes(usuarioId!).catch(console.warn)
     setModalSucesso({
       visivel: true,
       titulo: 'Medicamento excluído!',

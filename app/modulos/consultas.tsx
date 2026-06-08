@@ -431,7 +431,7 @@ export default function Consultas() {
             }
             fecharModal()
             await buscar()
-            await reagendarTodasNotificacoes(usuarioId)
+            await reagendarTodasNotificacoes(usuarioId).catch(console.warn)
             setModalSucesso({
                 visivel: true,
                 titulo: editando ? 'Consulta atualizada!' : 'Consulta cadastrada!',
@@ -462,7 +462,7 @@ export default function Consultas() {
         setModalExcluir(false)
         setExcluirId(null)
         await buscar()
-        await reagendarTodasNotificacoes(usuarioId!)
+        await reagendarTodasNotificacoes(usuarioId!).catch(console.warn)
         setModalSucesso({
             visivel: true,
             titulo: 'Consulta excluída!',

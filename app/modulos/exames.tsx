@@ -633,7 +633,7 @@ export default function Exames() {
 
       fecharModal()
       await buscar()
-      await reagendarTodasNotificacoes().catch(console.error)
+      await reagendarTodasNotificacoes(usuarioId!).catch(console.error)
       setModalSucesso({
         visivel: true,
         titulo: editando ? 'Exame atualizado!' : 'Exame cadastrado!',
@@ -662,7 +662,7 @@ export default function Exames() {
     setModalExcluir(false)
     setExcluirId(null)
     await buscar()
-    await reagendarTodasNotificacoes().catch(console.error)
+    await reagendarTodasNotificacoes(usuarioId!).catch(console.error)
     setModalSucesso({
       visivel: true,
       titulo: 'Exame excluído!',

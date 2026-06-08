@@ -1,26 +1,22 @@
 {
   "expo": {
-    "name": "Medly",
+    "name": "medly",
     "slug": "medly",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/adaptive-icon.png",
     "scheme": "appidosos",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
     },
     "android": {
+      "package": "com.medly.app",
       "adaptiveIcon": {
-        "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#FFFFFF"
       },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "package": "com.raquellll.medly"
+      "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
@@ -56,7 +52,7 @@
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true
+      "reactCompiler": false
     },
     "updates": {
       "enabled": false
@@ -64,7 +60,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "91a8fe06-b082-4913-b2fc-b261e3ecb277"
+        "projectId": "37e3a664-b4da-4826-b155-8b7d4bd95ae1"
       }
     }
   }
