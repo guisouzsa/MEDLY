@@ -1,5 +1,5 @@
 import { Feather } from '@expo/vector-icons'
-import * as FileSystem from 'expo-file-system/legacy'
+import * as FileSystem from 'expo-file-system'
 import * as ImagePicker from 'expo-image-picker'
 import { decode } from 'base64-arraybuffer'
 import { LinearGradient } from 'expo-linear-gradient'
