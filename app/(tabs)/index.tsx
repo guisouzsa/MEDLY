@@ -209,28 +209,40 @@ export default function Dashboard() {
   useFocusEffect(
     useCallback(() => {
       async function carregarTudo() {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-
-        const { data: perfil } = await supabase
-          .from('perfis').select('foto_url, nome').eq('id', user.id).single()
-        if (perfil) {
-          setNome(perfil.nome ?? '')
-          if (perfil.foto_url) {
-            const url = perfil.foto_url.includes('?') ? perfil.foto_url : `${perfil.foto_url}?t=${Date.now()}`
-            setFotoUri(url)
-          } else {
-            setFotoUri(null)
-          }
-        }
-
         try {
+          const { data: { user }, error: userError } = await supabase.auth.getUser()
+          if (userError) throw userError
+          if (!user) return
+
+          const { data: perfil, error: perfilError } = await supabase
+            .from('perfis').select('foto_url, nome').eq('id', user.id).single()
+          
+          if (perfilError && perfilError.code !== 'PGRST116') {
+            console.log('Erro ao carregar perfil:', perfilError.message)
+          }
+
+          if (perfil) {
+            setNome(perfil.nome ?? '')
+            if (perfil.foto_url) {
+              const url = perfil.foto_url.includes('?') ? perfil.foto_url : `${perfil.foto_url}?t=${Date.now()}`
+              setFotoUri(url)
+            } else {
+              setFotoUri(null)
+            }
+          }
+
           const [medsRes, consRes, exasRes, sintsRes] = await Promise.all([
             supabase.from('medicamentos').select('*, medicamento_horarios(*)').eq('usuario_id', user.id),
             supabase.from('consultas').select('*').eq('usuario_id', user.id),
             supabase.from('exames').select('*').eq('usuario_id', user.id),
             supabase.from('sintomas').select('*').eq('usuario_id', user.id),
           ])
+
+          if (medsRes.error) console.log('Erro ao carregar medicamentos:', medsRes.error.message)
+          if (consRes.error) console.log('Erro ao carregar consultas:', consRes.error.message)
+          if (exasRes.error) console.log('Erro ao carregar exames:', exasRes.error.message)
+          if (sintsRes.error) console.log('Erro ao carregar sintomas:', sintsRes.error.message)
+
           const payload = {
             medicamentos: medsRes.data || [],
             consultas: consRes.data || [],

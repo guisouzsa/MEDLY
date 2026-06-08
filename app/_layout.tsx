@@ -2,6 +2,7 @@ import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { useEffect } from 'react'
 import 'react-native-reanimated'
+import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { CadastroProvider } from '../src/context/CadastroContext'
 import { supabase } from '../src/lib/supabase'
 
@@ -38,14 +39,16 @@ export default function RootLayout() {
   }, [])
 
   return (
-    <CadastroProvider>
-      <Stack>
-      <Stack.Screen name="auth" options={{ headerShown: false }} />
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="modulos" options={{ headerShown: false }} />
-      <Stack.Screen name="+not-found" options={{ headerShown: false }} />
-    </Stack>
-      <StatusBar style="dark" />
-    </CadastroProvider>
+    <SafeAreaProvider>
+      <CadastroProvider>
+        <Stack>
+          <Stack.Screen name="auth" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="modulos" options={{ headerShown: false }} />
+          <Stack.Screen name="+not-found" options={{ headerShown: false }} />
+        </Stack>
+        <StatusBar style="dark" />
+      </CadastroProvider>
+    </SafeAreaProvider>
   )
 }
