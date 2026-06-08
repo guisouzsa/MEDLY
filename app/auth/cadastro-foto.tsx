@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons'
-import * as FileSystem from 'expo-file-system/legacy'
-import * as ImagePicker from 'expo-image-picker'
 import { decode } from 'base64-arraybuffer'
+import * as FileSystem from 'expo-file-system'
+import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
 import { router } from 'expo-router'
 import { useState } from 'react'
@@ -116,8 +116,6 @@ export default function CadastroFoto() {
         console.log('CATCH UPLOAD:', e)
       }
     }
-
-
 
     await supabase.from('perfis').upsert({
       id: user.id,
