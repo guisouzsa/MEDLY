@@ -9,13 +9,12 @@ import { supabase } from '../src/lib/supabase'
 export default function RootLayout() {
 
   useEffect(() => {
-    // Listener de sessão — redireciona se token expirar ou usuário deslogar
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    // Listener de sessão — redireciona APENAS se o token expirar ou o usuário deslogar
+    // Não interceptamos SIGNED_IN para não conflitar com a navegação do login/cadastro
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, _session) => {
       if (event === 'SIGNED_OUT') {
-        router.replace('/auth')
-      }
-      if (event === 'TOKEN_REFRESHED' && !session) {
-        router.replace('/auth')
+        // Pequeno delay para garantir que o navigator está montado
+        setTimeout(() => router.replace('/auth'), 100)
       }
     })
 
