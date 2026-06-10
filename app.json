@@ -7,7 +7,6 @@
     "icon": "./assets/images/adaptive-icon.png",
     "scheme": "appidosos",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true
     },
@@ -53,7 +52,8 @@
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": false
+      "reactCompiler": false,
+      "newArchEnabled": false
     },
     "updates": {
       "enabled": false
