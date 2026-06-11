@@ -210,10 +210,11 @@ export function getProximoLembrete(
   }
 }
 
+
 export async function salvarHistorico(usuarioId: string, descricao: string, tipo: string = 'geral') {
   try {
     const { error } = await supabase.from('historico').insert({
-      user_id: usuarioId,
+      usuario_id: usuarioId,
       descricao,
       tipo,
       data: new Date().toISOString(),
