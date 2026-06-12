@@ -145,6 +145,7 @@ type MedicamentoParaNotificar = {
   quantidade_por_dose: string
   frequencia_tipo: 'diario' | 'semanal' | 'mensal' | 'personalizado'
   intervalo_horas: number | null
+  horario: string | null
   data_inicio: string
   data_termino: string | null
   status: string
@@ -236,19 +237,31 @@ function obterHorariosParaDia(
   }
 
   if (med.frequencia_tipo === 'personalizado' && med.intervalo_horas) {
-    const dStart = new Date(med.data_inicio + 'T00:00:00')
-    const diffTime = dia.getTime() - dStart.getTime()
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
-    if (diffDays < 0) return []
-
+    const startHourStr = med.horario ? med.horario.slice(0, 5) : '00:00'
+    const [sh, sm] = startHourStr.split(':').map(Number)
     const H = med.intervalo_horas
     const resultado: string[] = []
-    const minK = Math.ceil((diffDays * 24) / H)
-    const maxK = Math.floor(((diffDays + 1) * 24 - 1) / H)
-    for (let k = minK; k <= maxK; k++) {
-      const hOffset = k * H
-      const hour = Math.floor(hOffset % 24)
-      resultado.push(`${String(hour).padStart(2, '0')}:00`)
+    
+    const [startYear, startMonth, startDay] = med.data_inicio.split('-').map(Number)
+    const start = new Date(startYear, startMonth - 1, startDay, sh, sm, 0)
+    
+    const dayStart = new Date(dia.getFullYear(), dia.getMonth(), dia.getDate(), 0, 0, 0)
+    const dayEnd = new Date(dia.getFullYear(), dia.getMonth(), dia.getDate(), 23, 59, 59)
+    
+    if (dayEnd >= start) {
+      const msDiff = dayStart.getTime() - start.getTime()
+      const hoursDiff = msDiff / (1000 * 60 * 60)
+      let k = Math.max(0, Math.ceil(hoursDiff / H))
+      
+      while (true) {
+        const occurrenceTime = new Date(start.getTime() + k * H * 1000 * 60 * 60)
+        if (occurrenceTime > dayEnd) break
+        
+        const hour = occurrenceTime.getHours()
+        const min = occurrenceTime.getMinutes()
+        resultado.push(`${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}`)
+        k++
+      }
     }
     return resultado
   }

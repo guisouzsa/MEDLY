@@ -1,4 +1,5 @@
 import { Feather } from '@expo/vector-icons'
+import { BlurView } from 'expo-blur'
 import { LinearGradient } from 'expo-linear-gradient'
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router'
 import * as DocumentPicker from 'expo-document-picker'
@@ -175,7 +176,7 @@ function CardExame({
   const [expandido, setExpandido] = useState(false)
   const isFuturo = !jaPassou(exame)
 
-  const temDetalhes = !!(exame.local || exame.data_resultado || exame.arquivo_url)
+  const temDetalhes = !!(exame.data_resultado || exame.arquivo_url)
 
   return (
     <View style={styles.card}>
@@ -239,13 +240,7 @@ function CardExame({
               <Text style={styles.infoLinhaTexto}>{formatarDataParaTela(exame.data_resultado)}</Text>
             </View>
           ) : null}
-          {exame.local ? (
-            <View style={styles.infoLinha}>
-              <Feather name="map-pin" size={15} color="#6B49AD" />
-              <Text style={styles.infoLinhaLabel}>Local</Text>
-              <Text style={styles.infoLinhaTexto}>{exame.local}</Text>
-            </View>
-          ) : null}
+
           {exame.arquivo_url ? (
             <TouchableOpacity
               onPress={() => onVerArquivo(exame.arquivo_url!, isImageUrl(exame.arquivo_url!))}
@@ -675,7 +670,7 @@ export default function Exames() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={[styles.safe, hideList === 'true' && { backgroundColor: 'transparent' }]} edges={['top']}>
       {hideList !== 'true' && (
         <>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
@@ -784,7 +779,9 @@ export default function Exames() {
           style={styles.modalFundo}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <TouchableOpacity style={styles.modalOverlay} onPress={fecharModal} activeOpacity={1} />
+          <BlurView intensity={40} tint="dark" style={styles.modalOverlay}>
+            <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={fecharModal} />
+          </BlurView>
           <Animated.View style={[styles.modalCard, { transform: [{ translateY: slideAnim }] }]}>
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <View style={styles.modalHandle} />
@@ -1118,7 +1115,7 @@ const styles = StyleSheet.create({
 
   // ── Modal form ───────────────────────────────────────────────────────────
   modalFundo: { flex: 1 },
-  modalOverlay: { flex: 1, backgroundColor: '#00000055' },
+  modalOverlay: { ...StyleSheet.absoluteFillObject, flex: 1 },
   modalCard: {
     backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28,
     padding: 24, maxHeight: height * 0.92,

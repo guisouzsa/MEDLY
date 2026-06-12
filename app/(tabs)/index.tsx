@@ -333,6 +333,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff', borderRadius: 60, paddingHorizontal: 12, paddingVertical: 8,
     marginBottom: 12,
     shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 6,
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 4px 12px rgba(107, 73, 173, 0.1)'
+      }
+    })
   },
   fotoPerfil: { width: 48, height: 48, borderRadius: 24 },
   fotoPerfilPlaceholder: {
@@ -347,6 +352,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     marginBottom: 12,
     shadowColor: '#301971', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 14, elevation: 10,
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 6px 14px rgba(48, 25, 113, 0.3)'
+      }
+    })
   },
   card2Esquerda: { flex: 1 },
   card2Ola: { color: '#D6B9FF', fontSize: 14, fontWeight: '600', marginBottom: 6 },
@@ -395,6 +405,11 @@ const styles = StyleSheet.create({
   acoesCard: {
     backgroundColor: '#fff', borderRadius: 24, padding: 20, marginBottom: 12,
     shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 4,
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 4px 12px rgba(107, 73, 173, 0.08)'
+      }
+    })
   },
   acoesTitle: { fontSize: 15, fontWeight: '700', color: '#301971', marginBottom: 16 },
   // flex: 1 em cada botão + row = divide igualmente sem quebrar
@@ -413,6 +428,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
     marginBottom: 8,
     shadowColor: '#481D94', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 4px 8px rgba(72, 29, 148, 0.3)'
+      }
+    })
   },
   acaoLabel: { fontSize: 11, fontWeight: '700', color: '#301971', textAlign: 'center' },
 

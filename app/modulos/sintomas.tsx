@@ -1,4 +1,5 @@
 import { Feather } from '@expo/vector-icons'
+import { BlurView } from 'expo-blur'
 import { LinearGradient } from 'expo-linear-gradient'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -455,7 +456,7 @@ export default function Sintomas() {
     const listaFiltrada = filtrarPorPeriodo(lista, filtro)
 
     return (
-        <SafeAreaView style={styles.safe} edges={['top']}>
+        <SafeAreaView style={[styles.safe, hideList === 'true' && { backgroundColor: 'transparent' }]} edges={['top']}>
             {hideList !== 'true' && (
                 <>
                     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
@@ -544,7 +545,9 @@ export default function Sintomas() {
 
             <Modal visible={modalVisivel} transparent animationType="none" onRequestClose={fecharModal}>
                 <KeyboardAvoidingView style={styles.modalFundo} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-                    <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={fecharModal} />
+                    <BlurView intensity={40} tint="dark" style={styles.modalOverlay}>
+                        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={fecharModal} />
+                    </BlurView>
                     <Animated.View style={[styles.modalCard, { transform: [{ translateY: slideAnim }] }]}>
                         <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                             <View style={styles.modalHandle} />
@@ -764,7 +767,7 @@ const styles = StyleSheet.create({
     },
 
     modalFundo: { flex: 1 },
-    modalOverlay: { flex: 1, backgroundColor: '#00000055' },
+    modalOverlay: { ...StyleSheet.absoluteFillObject, flex: 1 },
     modalCard: {
         backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28,
         padding: 24, maxHeight: height * 0.92,

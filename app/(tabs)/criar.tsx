@@ -5,7 +5,7 @@ import { useCallback, useState } from 'react'
 import {
     Dimensions, Image, Platform,
     StatusBar, StyleSheet, Text,
-    TouchableOpacity, View,
+    TouchableOpacity, View, ScrollView
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '../../src/lib/supabase'
@@ -13,10 +13,10 @@ import { supabase } from '../../src/lib/supabase'
 const { width } = Dimensions.get('window')
 
 const OPCOES = [
-  { label: 'Medicamento', descricao: 'Agendar e controlar', icone: 'activity', rota: '/modulos/medicamentos?action=create&hideList=true', colors: ['#6B49AD', '#481D94'], iconColor: '#fff', shadow: '#481D94' },
-  { label: 'Consulta',    descricao: 'Acompanhamento',      icone: 'calendar', rota: '/modulos/consultas?action=create&hideList=true',    colors: ['#2563EB', '#1D4ED8'], iconColor: '#fff', shadow: '#1D4ED8' },
-  { label: 'Sintoma',     descricao: 'Registrar histórico', icone: 'thermometer', rota: '/modulos/sintomas?action=create&hideList=true',  colors: ['#E11D48', '#BE123C'], iconColor: '#fff', shadow: '#BE123C' },
-  { label: 'Exame',       descricao: 'Marcar e resultados', icone: 'file-text', rota: '/modulos/exames?action=create&hideList=true',      colors: ['#059669', '#047857'], iconColor: '#fff', shadow: '#047857' },
+  { label: 'Medicamento', descricao: 'Agende medicamentos e controle doses diárias', icone: 'activity', rota: '/modulos/medicamentos?action=create&hideList=true', colors: ['#EBE3FF', '#DCCEFF'], iconColor: '#6B49AD', shadow: 'rgba(107, 73, 173, 0.15)' },
+  { label: 'Consulta',    descricao: 'Organize consultas médicas e acompanhamentos',      icone: 'calendar', rota: '/modulos/consultas?action=create&hideList=true',    colors: ['#E0EDFF', '#C4DDFF'], iconColor: '#2563EB', shadow: 'rgba(37, 99, 235, 0.15)' },
+  { label: 'Sintoma',     descricao: 'Registre a intensidade da dor e gatilhos', icone: 'thermometer', rota: '/modulos/sintomas?action=create&hideList=true',  colors: ['#FFE4E6', '#FECDD3'], iconColor: '#E11D48', shadow: 'rgba(225, 29, 72, 0.15)' },
+  { label: 'Exame',       descricao: 'Marque exames e faça o upload de resultados',       icone: 'file-text', rota: '/modulos/exames?action=create&hideList=true',      colors: ['#E6FDF4', '#C6F6E5'], iconColor: '#059669', shadow: 'rgba(5, 150, 105, 0.15)' },
 ]
 
 export default function Criar() {
@@ -55,7 +55,7 @@ export default function Criar() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.container}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContainer}>
         {/* Card 1 — Perfil + Logo */}
         <View style={styles.cardPerfil}>
           <TouchableOpacity onPress={() => router.push('/modulos/perfil' as any)} activeOpacity={0.85}>
@@ -63,7 +63,7 @@ export default function Criar() {
               <Image source={{ uri: perfilFoto }} style={styles.fotoPerfil} onError={() => setPerfilFoto(null)} />
             ) : (
               <View style={styles.fotoPerfilPlaceholder}>
-                <Feather name="user" size={24} color="#9163CB" />
+                <Feather name="user" size={24} color="#6B49AD" />
               </View>
             )}
           </TouchableOpacity>
@@ -73,38 +73,38 @@ export default function Criar() {
 
         {/* Pergunta */}
         <View style={styles.tituloSecao}>
-          <Text style={styles.titulo}>O que deseja criar hoje?</Text>
-          <Text style={styles.subtitulo}>Selecione um registro para adicionar</Text>
+          <Text style={styles.titulo}>Criar Registro</Text>
+          <Text style={styles.subtitulo}>Selecione uma categoria para adicionar</Text>
         </View>
 
-        {/* Grid de opções maiores (divisão da tela) */}
-        <View style={styles.grid}>
+        {/* Lista Vertical Premium */}
+        <View style={styles.listaVertical}>
           {OPCOES.map((op) => (
             <TouchableOpacity
               key={op.label}
-              style={styles.botaoWrapper}
+              style={[styles.itemCard, Platform.OS === 'web' && { boxShadow: `0px 10px 25px ${op.shadow}` } as any]}
               onPress={() => router.push(op.rota as any)}
               activeOpacity={0.85}
             >
               <LinearGradient
                 colors={op.colors as [string, string]}
-                style={styles.botaoFundo}
+                style={styles.cardIconeWrapper}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
               >
-                <View style={styles.botaoIconeWrapper}>
-                  <Feather name={op.icone as any} size={32} color={op.iconColor} />
-                </View>
-                <View style={styles.botaoTextos}>
-                  <Text style={styles.botaoLabel}>{op.label}</Text>
-                  <Text style={styles.botaoDesc}>{op.descricao}</Text>
-                </View>
-                <Feather name="chevron-right" size={20} color="rgba(255,255,255,0.6)" style={{ position: 'absolute', bottom: 20, right: 20 }} />
+                <Feather name={op.icone as any} size={26} color={op.iconColor} />
               </LinearGradient>
+              <View style={styles.cardTextos}>
+                <Text style={styles.cardLabel}>{op.label}</Text>
+                <Text style={styles.cardDesc}>{op.descricao}</Text>
+              </View>
+              <View style={styles.chevronWrapper}>
+                <Feather name="chevron-right" size={20} color="#6B49AD" />
+              </View>
             </TouchableOpacity>
           ))}
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   )
 }
@@ -112,20 +112,34 @@ export default function Criar() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#F5F0FF',
+    backgroundColor: '#F8F6FC',
   },
-  container: {
-    flex: 1,
-    paddingHorizontal: 16,
+  scrollContainer: {
+    paddingHorizontal: 20,
     paddingTop: 12,
+    paddingBottom: 120,
   },
   cardPerfil: {
-    backgroundColor: '#fff', marginHorizontal: 0, marginTop: 0,
-    borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10,
-    flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between',
-    shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1, shadowRadius: 12, elevation: 5,
-    marginBottom: 20,
+    backgroundColor: '#fff',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#6B49AD',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
+    marginBottom: 28,
+    borderWidth: 1,
+    borderColor: '#F0EAFF',
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 4px 16px rgba(107, 73, 173, 0.08)'
+      }
+    })
   },
   fotoPerfil: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#E2D9F3' },
   fotoPerfilPlaceholder: {
@@ -135,66 +149,69 @@ const styles = StyleSheet.create({
   logo: { width: 110, height: 36 },
 
   tituloSecao: {
-    marginBottom: 20,
+    marginBottom: 24,
     paddingHorizontal: 4,
   },
   titulo: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: '800',
-    color: '#301971',
-    marginBottom: 4,
+    color: '#1C0D3F',
+    marginBottom: 6,
+    letterSpacing: -0.5,
   },
   subtitulo: {
     fontSize: 15,
-    color: '#9163CB',
-    fontWeight: '600',
+    color: '#866FA8',
+    fontWeight: '500',
   },
 
-  grid: {
-    flex: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    alignContent: 'flex-start',
+  listaVertical: {
     gap: 16,
-    paddingBottom: 24,
   },
-  botaoWrapper: {
-    width: '47%',
-    height: 180,
-    borderRadius: 28,
-    shadowColor: '#481D94',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 8,
+  itemCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#F1EEF8',
+    shadowColor: '#6B49AD',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    elevation: 5,
   },
-  botaoFundo: {
-    flex: 1,
-    borderRadius: 28,
-    padding: 20,
-    justifyContent: 'space-between',
-  },
-  botaoIconeWrapper: {
-    width: 56,
-    height: 56,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+  cardIconeWrapper: {
+    width: 58,
+    height: 58,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  botaoTextos: {
-    marginTop: 'auto',
+  cardTextos: {
+    flex: 1,
+    marginLeft: 16,
+    paddingRight: 8,
   },
-  botaoLabel: {
+  cardLabel: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#fff',
+    color: '#1C0D3F',
     marginBottom: 4,
   },
-  botaoDesc: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
+  cardDesc: {
+    fontSize: 13,
+    color: '#866FA8',
     fontWeight: '500',
+    lineHeight: 18,
+  },
+  chevronWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F6F3FB',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 })

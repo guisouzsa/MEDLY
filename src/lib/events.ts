@@ -122,18 +122,26 @@ export function getEventsForDate(
         })
       }
     } else if (med.frequencia_tipo === 'personalizado') {
-      const dStart = new Date(med.data_inicio + 'T00:00:00')
-      const diffTime = currentLocalDate.getTime() - dStart.getTime()
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
-      if (diffDays >= 0) {
-        const H = med.intervalo_horas
-        if (H && H > 0) {
-          const minK = Math.ceil((diffDays * 24) / H)
-          const maxK = Math.floor(((diffDays + 1) * 24 - 1) / H)
-          for (let k = minK; k <= maxK; k++) {
-            const h_offset = k * H
-            const hour = Math.floor(h_offset % 24)
-            const horarioStr = `${String(hour).padStart(2, '0')}:00`
+      const startHourStr = med.horario ? med.horario.slice(0, 5) : '08:00'
+      const [sh, sm] = startHourStr.split(':').map(Number)
+      const H = med.intervalo_horas
+      if (H && H > 0) {
+        const dayStart = new Date(dateStr + 'T00:00:00')
+        const dayEnd = new Date(dateStr + 'T23:59:59')
+        const start = new Date(med.data_inicio + 'T' + startHourStr + ':00')
+        
+        if (dayEnd >= start) {
+          const msDiff = dayStart.getTime() - start.getTime()
+          const hoursDiff = msDiff / (1000 * 60 * 60)
+          let k = Math.max(0, Math.ceil(hoursDiff / H))
+          
+          while (true) {
+            const occurrenceTime = new Date(start.getTime() + k * H * 1000 * 60 * 60)
+            if (occurrenceTime > dayEnd) break
+            
+            const hour = occurrenceTime.getHours()
+            const min = occurrenceTime.getMinutes()
+            const horarioStr = `${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}`
             events.push({
               id: `med-${med.id}-${horarioStr}`,
               tipo: 'medicamento',
@@ -142,6 +150,7 @@ export function getEventsForDate(
               horario: horarioStr,
               dados: med,
             })
+            k++
           }
         }
       }
@@ -181,8 +190,9 @@ export function getProximoLembrete(
 
     for (const ev of evs) {
       if (ev.tipo === 'sintoma') continue
+      if (!ev.horario) continue // pular eventos sem horário definido
 
-      const timeStr = ev.horario || '00:00'
+      const timeStr = ev.horario
       const [h, m] = timeStr.split(':').map(Number)
       const evDatetime = new Date(dateStr + `T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`)
 
@@ -216,12 +226,13 @@ export async function salvarHistorico(usuarioId: string, descricao: string, tipo
   try {
     const { error } = await supabase.from('historico').insert({
       usuario_id: usuarioId,
+      user_id: usuarioId,
       descricao,
       tipo,
       data: new Date().toISOString(),
     })
-    if (error) console.error('Erro ao salvar historico:', error.message)
+    if (error) console.warn('[Historico] Falha ao salvar (RLS):', error.message)
   } catch (err) {
-    console.error('Catch ao salvar historico:', err)
+    console.warn('[Historico] Catch ao salvar:', err)
   }
 }

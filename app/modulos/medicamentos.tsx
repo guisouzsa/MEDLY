@@ -1,4 +1,5 @@
 import { Feather } from '@expo/vector-icons'
+import { BlurView } from 'expo-blur'
 import { LinearGradient } from 'expo-linear-gradient'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -30,6 +31,7 @@ type Medicamento = {
   dosagem: string
   frequencia_tipo: 'diario' | 'semanal' | 'mensal' | 'personalizado'
   intervalo_horas: number | null
+  horario: string | null
   data_inicio: string
   data_termino: string | null
   data_retorno: string | null
@@ -263,7 +265,16 @@ function CardMedicamento({
       return horariosUnicos.length > 0 ? horariosUnicos.join(' · ') : null
     }
     if (med.frequencia_tipo === 'personalizado' && med.intervalo_horas) {
-      return `A cada ${med.intervalo_horas}h`
+      const H = med.intervalo_horas
+      const startHourStr = med.horario ? med.horario.slice(0, 5) : '00:00'
+      const [sh, sm] = startHourStr.split(':').map(Number)
+      const hrs: string[] = []
+      for (let hOffset = 0; hOffset < 24; hOffset += H) {
+        const h = (sh + hOffset) % 24
+        hrs.push(`${String(h).padStart(2, '0')}:${String(sm).padStart(2, '0')}`)
+      }
+      hrs.sort((a, b) => a.localeCompare(b))
+      return hrs.join(' · ')
     }
     return null
   }
@@ -439,6 +450,7 @@ export default function Medicamentos() {
   const [dosagem, setDosagem] = useState('')
   const [frequenciaTipo, setFrequenciaTipo] = useState<Medicamento['frequencia_tipo']>('diario')
   const [intervaloHoras, setIntervaloHoras] = useState('')
+  const [horarioPersonalizado, setHorarioPersonalizado] = useState('08:00')
   const [dataInicio, setDataInicio] = useState('')
   const [dataTermino, setDataTermino] = useState('')
   const [dataRetorno, setDataRetorno] = useState('')
@@ -508,7 +520,7 @@ export default function Medicamentos() {
 
   function resetForm() {
     setNome(''); setDosagem(''); setFrequenciaTipo('diario')
-    setIntervaloHoras(''); setDataInicio(''); setDataTermino('')
+    setIntervaloHoras(''); setHorarioPersonalizado('08:00'); setDataInicio(''); setDataTermino('')
     setDataRetorno(''); setQuantidadePorDose(''); setObservacoes('')
     setStatus('ativo'); setMotivoEncerramento(''); setHorarios([''])
     setDiasSemanaSelecionados([]); setHorariosSemanal([''])
@@ -536,6 +548,7 @@ export default function Medicamentos() {
         setHorarios(hs.length > 0 ? hs.map(h => h.horario.slice(0, 5)) : [''])
         setDiasSemanaSelecionados([]); setHorariosSemanal([''])
         setDiasMesSelecionados([]); setHorariosMensal([''])
+        setHorarioPersonalizado('08:00')
       } else if (med.frequencia_tipo === 'semanal') {
         setHorarios([''])
         const diasUnicos = [...new Set(hs.map(h => h.dia_semana).filter(d => d !== null) as number[])]
@@ -543,15 +556,18 @@ export default function Medicamentos() {
         const horariosUnicos = [...new Set(hs.map(h => h.horario.slice(0, 5)))]
         setHorariosSemanal(horariosUnicos.length > 0 ? horariosUnicos : [''])
         setDiasMesSelecionados([]); setHorariosMensal([''])
+        setHorarioPersonalizado('08:00')
       } else if (med.frequencia_tipo === 'mensal') {
         setHorarios([]); setDiasSemanaSelecionados([]); setHorariosSemanal([''])
         const diasUnicos = [...new Set(hs.map(h => h.dia_mes).filter(d => d !== null) as number[])]
         setDiasMesSelecionados(diasUnicos)
         const horariosUnicos = [...new Set(hs.map(h => h.horario.slice(0, 5)))]
         setHorariosMensal(horariosUnicos.length > 0 ? horariosUnicos : [''])
+        setHorarioPersonalizado('08:00')
       } else {
         setHorarios(['']); setDiasSemanaSelecionados([]); setHorariosSemanal([''])
         setDiasMesSelecionados([]); setHorariosMensal([''])
+        setHorarioPersonalizado(med.horario ? med.horario.slice(0, 5) : '08:00')
       }
     } else {
       resetForm()
@@ -588,7 +604,10 @@ export default function Medicamentos() {
     if (!quantidadePorDose.trim()) e.quantidadePorDose = true
     if (!dataInicio || dataInicio.length < 10) e.dataInicio = true
     if (dataInicio.length === 10 && dataEhPassada(dataInicio)) e.dataInicioPassada = true
-    if (frequenciaTipo === 'personalizado' && !intervaloHoras) e.intervaloHoras = true
+    if (frequenciaTipo === 'personalizado') {
+      if (!intervaloHoras) e.intervaloHoras = true
+      if (!horarioPersonalizado || horarioPersonalizado.length < 5) e.horarioPersonalizado = true
+    }
     if (status === 'pausado' && (!dataRetorno || dataRetorno.length < 10)) e.dataRetorno = true
     if (frequenciaTipo === 'semanal') {
       if (diasSemanaSelecionados.length === 0) e.diasSemana = true
@@ -620,6 +639,7 @@ export default function Medicamentos() {
         dosagem: dosagem.trim(),
         frequencia_tipo: frequenciaTipo,
         intervalo_horas: intervaloHoras ? parseInt(intervaloHoras) : null,
+        horario: frequenciaTipo === 'personalizado' ? (horarioPersonalizado.trim() || null) : null,
         data_inicio: converterData(dataInicio),
         data_termino: dataTermino && dataTermino.length === 10 ? converterData(dataTermino) : null,
         data_retorno: status === 'pausado' && dataRetorno.length === 10 ? converterData(dataRetorno) : null,
@@ -787,7 +807,7 @@ export default function Medicamentos() {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={[styles.safe, hideList === 'true' && { backgroundColor: 'transparent' }]} edges={['top']}>
       {hideList !== 'true' && (
         <>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
@@ -888,7 +908,9 @@ export default function Medicamentos() {
       {/* Modal cadastro/edição */}
       <Modal visible={modalVisivel} transparent animationType="none">
         <KeyboardAvoidingView style={styles.modalFundo} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} />
+          <BlurView intensity={40} tint="dark" style={styles.modalOverlay}>
+            <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={fecharModal} />
+          </BlurView>
           <Animated.View style={[styles.modalCard, { transform: [{ translateY: slideAnim }] }]}>
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <View style={styles.modalHandle} />
@@ -938,10 +960,19 @@ export default function Medicamentos() {
               {frequenciaTipo === 'semanal' && renderSemanal()}
               {frequenciaTipo === 'mensal' && renderMensal()}
               {frequenciaTipo === 'personalizado' && (
-                <Campo label="INTERVALO EM HORAS" value={intervaloHoras}
-                  onChangeText={(v) => { setIntervaloHoras(v); setErros(p => ({ ...p, intervaloHoras: false })) }}
-                  placeholder="Ex: 8" keyboardType="numeric" erro={erros.intervaloHoras}
-                  dica="O medicamento será lembrado a cada X horas a partir do início." />
+                <View style={styles.duasColunas}>
+                  <View style={[styles.coluna, { flex: 1 }]}>
+                    <Campo label="INTERVALO EM HORAS" value={intervaloHoras}
+                      onChangeText={(v) => { setIntervaloHoras(v); setErros(p => ({ ...p, intervaloHoras: false })) }}
+                      placeholder="Ex: 8" keyboardType="numeric" erro={erros.intervaloHoras} />
+                  </View>
+                  <View style={[styles.coluna, { flex: 1 }]}>
+                    <Campo label="HORA DE INÍCIO" value={horarioPersonalizado}
+                      onChangeText={(v) => { setHorarioPersonalizado(mascaraHorario(v)); setErros(p => ({ ...p, horarioPersonalizado: false })) }}
+                      placeholder="Ex: 08:00" keyboardType="numeric" erro={erros.horarioPersonalizado}
+                      dica="Hora da primeira dose" />
+                  </View>
+                </View>
               )}
 
               <View style={styles.duasColunas}>
@@ -1208,7 +1239,7 @@ const styles = StyleSheet.create({
 
   // Modal form
   modalFundo: { flex: 1 },
-  modalOverlay: { flex: 1, backgroundColor: '#00000055' },
+  modalOverlay: { ...StyleSheet.absoluteFillObject, flex: 1 },
   modalCard: {
     backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28,
     padding: 24, maxHeight: height * 0.92,

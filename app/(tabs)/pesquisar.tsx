@@ -5,6 +5,7 @@ import { useCallback, useState } from 'react'
 import {
     ActivityIndicator,
     Image,
+    Platform,
     ScrollView,
     StyleSheet, Text,
     TextInput, TouchableOpacity, View
@@ -311,6 +312,11 @@ const styles = StyleSheet.create({
     shadowColor: '#481D94', shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.1, shadowRadius: 14, elevation: 8,
     marginBottom: 24,
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 6px 14px rgba(72, 29, 148, 0.1)'
+      }
+    })
   },
   inputBox: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
@@ -335,10 +341,20 @@ const styles = StyleSheet.create({
     borderRadius: 50, paddingHorizontal: 16, paddingVertical: 10,
     shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 2px 4px rgba(107, 73, 173, 0.04)'
+      }
+    })
   },
   filtroPilAtivo: {
     backgroundColor: '#6B49AD', borderColor: '#6B49AD',
     shadowOpacity: 0.15, shadowRadius: 8, elevation: 4, shadowOffset: { width: 0, height: 4 },
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 4px 8px rgba(107, 73, 173, 0.15)'
+      }
+    })
   },
   filtroPilTexto: {
     fontSize: 14, fontWeight: '700', color: '#6B49AD',
@@ -365,6 +381,11 @@ const styles = StyleSheet.create({
     shadowColor: '#481D94', shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08, shadowRadius: 12, elevation: 4,
     borderWidth: 1, borderColor: '#F5F0FF',
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 4px 12px rgba(72, 29, 148, 0.08)'
+      }
+    })
   },
   cardIconeBox: {
     width: 56, height: 56, borderRadius: 20,

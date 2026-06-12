@@ -17,6 +17,7 @@
     "ajv": "^8.20.0",
     "base64-arraybuffer": "^1.0.2",
     "expo": "~56.0.11",
+    "expo-blur": "~56.0.3",
     "expo-constants": "~56.0.17",
     "expo-document-picker": "~56.0.4",
     "expo-file-system": "~56.0.7",
