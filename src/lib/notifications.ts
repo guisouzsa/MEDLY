@@ -19,6 +19,11 @@ const CATEGORIA_EXAME = 'exame'
  * cria o canal Android obrigatório e registra as categorias com botões de ação.
  */
 export async function inicializarNotificacoes() {
+  if (Platform.OS === 'web') {
+    console.log('Notificações nativas ignoradas no ambiente Web.')
+    return
+  }
+
   // Handler: como exibir notificações quando o app está em primeiro plano
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -90,6 +95,7 @@ export async function inicializarNotificacoes() {
  * Pede permissão para enviar notificações. Retorna true se concedido.
  */
 export async function pedirPermissaoNotificacoes(): Promise<boolean> {
+  if (Platform.OS === 'web') return false
   const { status: existente } = await Notifications.getPermissionsAsync()
   if (existente === 'granted') return true
 
@@ -101,6 +107,7 @@ export async function pedirPermissaoNotificacoes(): Promise<boolean> {
  * Verifica se a permissão já foi concedida (sem pedir).
  */
 export async function verificarPermissao(): Promise<boolean> {
+  if (Platform.OS === 'web') return false
   const { status } = await Notifications.getPermissionsAsync()
   return status === 'granted'
 }
@@ -111,6 +118,7 @@ export async function verificarPermissao(): Promise<boolean> {
  * Cancela todas as notificações agendadas.
  */
 export async function cancelarTodasNotificacoes() {
+  if (Platform.OS === 'web') return
   await Notifications.cancelAllScheduledNotificationsAsync()
 }
 
@@ -119,6 +127,7 @@ export async function cancelarTodasNotificacoes() {
  * Ex: cancelarNotificacoesPorPrefixo('med-42') cancela med-42-08:00, med-42-14:00, etc.
  */
 export async function cancelarNotificacoesPorPrefixo(prefixo: string) {
+  if (Platform.OS === 'web') return
   const agendadas = await Notifications.getAllScheduledNotificationsAsync()
   for (const notif of agendadas) {
     if (notif.identifier.startsWith(prefixo)) {
@@ -192,7 +201,6 @@ async function agendarMedicamento(med: MedicamentoParaNotificar): Promise<number
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
           date: dataNotificacao,
-          channelId: CANAL_LEMBRETES,
         },
       })
       count++
@@ -293,7 +301,6 @@ async function agendarConsulta(consulta: ConsultaParaNotificar): Promise<number>
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
       date: dataNotificacao,
-      channelId: CANAL_LEMBRETES,
     },
   })
   count++
@@ -347,7 +354,6 @@ async function agendarExame(exame: ExameParaNotificar): Promise<number> {
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
       date: dataNotificacao,
-      channelId: CANAL_LEMBRETES,
     },
   })
   count++

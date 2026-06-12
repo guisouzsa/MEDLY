@@ -121,7 +121,7 @@ export default function Pesquisar() {
           }
 
           if (filtro === 'todos' || filtro === 'exames') {
-            const { data } = await supabase.from('exames').select('id, nome, data_realizacao, status').eq('usuario_id', user.id)
+            const { data } = await supabase.from('exames').select('id, nome, data_realizacao, horario').eq('usuario_id', user.id)
             data?.forEach(e => {
               const dataFormatada = (() => {
                 if (!e.data_realizacao) return ''
@@ -129,10 +129,19 @@ export default function Pesquisar() {
                 if (parts.length < 3) return e.data_realizacao
                 return `${parts[2]}/${parts[1]}/${parts[0]}`
               })()
+              const status = (() => {
+                if (!e.data_realizacao) return ''
+                const agora = new Date()
+                const [ano, mes, dia] = e.data_realizacao.split('-').map(Number)
+                const horarioStr = e.horario ? e.horario.slice(0, 5) : '23:59'
+                const [hora, minuto] = horarioStr.split(':').map(Number)
+                const dataExame = new Date(ano, mes - 1, dia, hora, minuto)
+                return dataExame < agora ? 'Realizado' : 'Próximo'
+              })()
               resultado.push({
                 id: e.id, tipo: 'exames',
                 titulo: e.nome,
-                subtitulo: [dataFormatada, e.status].filter(Boolean).join(' · '),
+                subtitulo: [dataFormatada, status].filter(Boolean).join(' · '),
                 icone: 'file-text',
               })
             })

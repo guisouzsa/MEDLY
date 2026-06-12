@@ -117,12 +117,16 @@ export default function CadastroFoto() {
       }
     }
 
-    await supabase.from('perfis').upsert({
+    const { error: perfilError } = await supabase.from('perfis').upsert({
       id: user.id,
       nome: dados.nome.trim(),
       email: dados.email.trim(),
       foto_url: fotoUrl,
     })
+
+    if (perfilError) {
+      console.error('Erro ao salvar perfil:', perfilError.message)
+    }
 
     limpar()
     setCarregando(false)
