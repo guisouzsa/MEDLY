@@ -141,31 +141,6 @@ function Calendario({ data }: { data: any }) {
   )
 }
 
-function ModalSair({ visivel, onCancelar, onConfirmar }: { visivel: boolean; onCancelar: () => void; onConfirmar: () => void }) {
-  return (
-    <Modal visible={visivel} transparent animationType="fade">
-      <View style={styles.modalFundo}>
-        <View style={styles.modalCard}>
-          <Text style={styles.modalTitulo}>Sair da conta</Text>
-          <Text style={styles.modalMensagem}>Tem certeza que deseja sair? Você precisará fazer login novamente.</Text>
-          <TouchableOpacity onPress={onConfirmar} activeOpacity={0.85} style={styles.modalBotaoWrapper}>
-            <LinearGradient
-              colors={['#5E44A7', '#481D94', '#301971']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={styles.modalBotao}
-            >
-              <Text style={styles.modalBotaoTexto}>SIM, SAIR</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={onCancelar} style={styles.modalBotaoCancelar}>
-            <Text style={styles.modalBotaoCancelarTexto}>Cancelar</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
-  )
-}
-
 // ─── Ações rápidas: responsivo com flexWrap e largura controlada ──────────────
 function LinhaAcoes({ acoes }: { acoes: typeof ACOES_LINHA1 }) {
   return (
@@ -195,7 +170,7 @@ export default function Dashboard() {
   const [hora, setHora] = useState(getHora())
   const [nome, setNome] = useState('')
   const [fotoUri, setFotoUri] = useState<string | null>(null)
-  const [modalSair, setModalSair] = useState(false)
+
   const [dbData, setDbData] = useState<{
     medicamentos: any[]; consultas: any[]; exames: any[]; sintomas: any[]
   }>({ medicamentos: [], consultas: [], exames: [], sintomas: [] })
@@ -259,10 +234,6 @@ export default function Dashboard() {
     }, [])
   )
 
-  async function sair() {
-    await supabase.auth.signOut()
-    router.replace('/auth')
-  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -273,6 +244,8 @@ export default function Dashboard() {
       >
         {/* CARD 1 — header */}
         <View style={styles.card1}>
+          <View style={{ width: 48 }} />
+          <Image source={require('../../assets/images/logo.png')} style={styles.logoHeader} resizeMode="contain" />
           <TouchableOpacity onPress={() => router.push('/modulos/perfil' as any)} activeOpacity={0.85}>
             {fotoUri ? (
               <Image source={{ uri: fotoUri }} style={styles.fotoPerfil} onError={() => setFotoUri(null)} />
@@ -282,7 +255,6 @@ export default function Dashboard() {
               </View>
             )}
           </TouchableOpacity>
-          <Image source={require('../../assets/images/logo.png')} style={styles.logoHeader} resizeMode="contain" />
         </View>
 
         {/* CARD 2 — saudação */}
@@ -340,17 +312,8 @@ export default function Dashboard() {
 
         {/* CARD 5 — calendário */}
         <Calendario data={dbData} />
-
-        {/* Botão sair */}
-        <TouchableOpacity style={styles.botaoSair} onPress={() => setModalSair(true)} activeOpacity={0.8}>
-          <Feather name="log-out" size={18} color="#6B49AD" />
-          <Text style={styles.botaoSairTexto}>Sair da conta</Text>
-        </TouchableOpacity>
-
         <View style={{ height: 100 }} />
       </ScrollView>
-
-      <ModalSair visivel={modalSair} onCancelar={() => setModalSair(false)} onConfirmar={sair} />
     </SafeAreaView>
   )
 }
@@ -489,32 +452,4 @@ const styles = StyleSheet.create({
   legendaQuadrado: { width: 14, height: 14, borderRadius: 4 },
   legendaTexto: { fontSize: 10, color: '#9163CB', fontWeight: '600' },
 
-  // ── Botão sair ───────────────────────────────────────────────────────────────
-  botaoSair: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    borderWidth: 1.5, borderColor: '#6B49AD', borderRadius: 60,
-    paddingVertical: 16, marginBottom: 12, backgroundColor: '#fff',
-  },
-  botaoSairTexto: { fontSize: 15, fontWeight: '700', color: '#6B49AD' },
-
-  // ── Modal ────────────────────────────────────────────────────────────────────
-  modalFundo: {
-    flex: 1, backgroundColor: '#00000066',
-    justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32,
-  },
-  modalCard: {
-    backgroundColor: '#fff', borderRadius: 24, padding: 28, width: '100%', alignItems: 'center',
-    shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 12,
-  },
-  modalTitulo: { fontSize: 18, fontWeight: '800', color: '#301971', marginBottom: 10, letterSpacing: 0.5 },
-  modalMensagem: { fontSize: 15, color: '#6B49AD', textAlign: 'center', marginBottom: 24, lineHeight: 22 },
-  modalBotaoWrapper: {
-    width: '100%',
-    shadowColor: '#301971', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
-    marginBottom: 12,
-  },
-  modalBotao: { borderRadius: 60, paddingVertical: 14, alignItems: 'center' },
-  modalBotaoTexto: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 2 },
-  modalBotaoCancelar: { paddingVertical: 12, paddingHorizontal: 24 },
-  modalBotaoCancelarTexto: { fontSize: 14, fontWeight: '600', color: '#9163CB' },
 })

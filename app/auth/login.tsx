@@ -24,11 +24,11 @@ const CARD_W = Math.min(width * 0.88, 420)
 function Campo({
   label, value, onChangeText, placeholder,
   secureTextEntry = false, keyboardType = 'default' as any,
-  icone, mostrarOlho = false, erro = false,
+  icone, mostrarOlho = false, erro = false, erroTexto = '',
 }: {
   label: string, value: string, onChangeText: (t: string) => void,
   placeholder?: string, secureTextEntry?: boolean, keyboardType?: any,
-  icone: any, mostrarOlho?: boolean, erro?: boolean,
+  icone: any, mostrarOlho?: boolean, erro?: boolean | string, erroTexto?: string,
 }) {
   const [visivel, setVisivel] = useState(false)
   return (
@@ -53,6 +53,7 @@ function Campo({
           </TouchableOpacity>
         )}
       </View>
+      {!!erroTexto && erro && <Text style={styles.erroTexto}>{erroTexto}</Text>}
     </View>
   )
 }
@@ -121,6 +122,7 @@ export default function Login() {
               keyboardType="email-address"
               icone={require('../../assets/images/icone-email.png')}
               erro={erros.email}
+              erroTexto="E-mail obrigatório"
             />
 
             <Campo
@@ -132,6 +134,7 @@ export default function Login() {
               mostrarOlho
               icone={require('../../assets/images/icone-senha.png')}
               erro={erros.senha}
+              erroTexto="Senha obrigatória"
             />
           </View>
 
@@ -203,6 +206,7 @@ const styles = StyleSheet.create({
   campoRowErro: {
     borderColor: '#e53e3e',
   },
+  erroTexto: { color: '#e53e3e', fontSize: 11, fontWeight: '600', marginTop: 4, marginLeft: 16 },
   icone: { width: 20, height: 20, marginRight: 12 },
   input: { flex: 1, fontSize: 15, color: '#301971', paddingVertical: 0 },
   olho: { padding: 4, marginLeft: 8 },

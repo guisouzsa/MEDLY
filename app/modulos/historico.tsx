@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
   cardPerfil: {
     backgroundColor: '#fff', marginHorizontal: 0, marginTop: 0,
     borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between',
     shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1, shadowRadius: 12, elevation: 5,
     marginBottom: 14,

@@ -49,6 +49,7 @@ export function getEventsForDate(
         tipo: 'exame',
         titulo: `Realização de Exame: ${exa.nome}`,
         descricao: exa.local ? `Local: ${exa.local}` : 'Horário não informado',
+        horario: exa.horario ? exa.horario.slice(0, 5) : undefined,
         dados: exa,
       })
     }

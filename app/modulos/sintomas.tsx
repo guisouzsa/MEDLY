@@ -286,7 +286,7 @@ function CardSintoma({
 }
 
 export default function Sintomas() {
-    const { action } = useLocalSearchParams()
+    const { action, hideList } = useLocalSearchParams()
     const [usuarioId, setUsuarioId] = useState<string | null>(null)
     const [lista, setLista] = useState<Sintoma[]>([])
     const [perfilFoto, setPerfilFoto] = useState<string | null>(null)
@@ -373,7 +373,11 @@ export default function Sintomas() {
     }
 
     function fecharModal() {
-        Animated.timing(slideAnim, { toValue: height, duration: 280, useNativeDriver: true }).start(() => setModalVisivel(false))
+        Animated.timing(slideAnim, { toValue: height, duration: 280, useNativeDriver: true })
+            .start(() => {
+                setModalVisivel(false)
+                if (hideList === 'true') router.back()
+            })
     }
 
     function validar(): boolean {
@@ -412,7 +416,6 @@ export default function Sintomas() {
                 if (error) throw error
                 await salvarHistorico(usuarioId, `Sintoma ${nome.trim()} com intensidade ${intensidade}/10 foi registrado`)
             }
-            fecharModal()
             await buscar()
             setModalSucesso({
                 visivel: true,
@@ -453,102 +456,95 @@ export default function Sintomas() {
 
     return (
         <SafeAreaView style={styles.safe} edges={['top']}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-
-                {/* Header */}
-                <View style={styles.cardPerfil}>
-                    <TouchableOpacity onPress={() => router.push('/modulos/perfil' as any)} activeOpacity={0.85}>
-                        {perfilFoto ? (
-                            <Image source={{ uri: perfilFoto }} style={styles.fotoPerfil} onError={() => setPerfilFoto(null)} />
-                        ) : (
-                            <View style={styles.fotoPerfilPlaceholder}>
-                                <Feather name="user" size={24} color="#9163CB" />
-                            </View>
-                        )}
-                    </TouchableOpacity>
-                    <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
-                    <TouchableOpacity onPress={() => router.back()} style={styles.voltarBtn}>
-                        <Feather name="arrow-left" size={18} color="#6B49AD" />
-                    </TouchableOpacity>
-                </View>
-
-                {/* Título */}
-                <LinearGradient
-                    colors={['#6B49AD', '#6843B1', '#481D94']}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                    style={styles.cardTituloLista}
-                >
-                    <Text style={styles.cardTituloTexto}>SINTOMAS</Text>
-                </LinearGradient>
-
-                {/* Filtros */}
-                <View style={styles.filtrosRow}>
-                    {filtroOrdem.map((f) => (
-                        <TouchableOpacity
-                            key={f}
-                            onPress={() => setFiltro(f)}
-                            activeOpacity={0.8}
-                            style={[styles.chip, filtro === f && styles.chipAtivo]}
-                        >
-                            {filtro === f ? (
-                                <LinearGradient
-                                    colors={['#6B49AD', '#481D94']}
-                                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                                    style={styles.chipGradient}
-                                >
-                                    <Text style={styles.chipTextoAtivo}>{filtroLabels[f]}</Text>
-                                </LinearGradient>
-                            ) : (
-                                <View style={styles.chipInner}>
-                                    <Text style={styles.chipTexto}>{filtroLabels[f]}</Text>
-                                </View>
-                            )}
-                        </TouchableOpacity>
-                    ))}
-                </View>
-
-                {/* Lista */}
-                <View style={styles.cardLista}>
-                    {listaFiltrada.length === 0 ? (
-                        <View style={styles.vazioContainer}>
-                            <View style={styles.vazioIcone}>
-                                <Feather name="thermometer" size={36} color="#9163CB" />
-                            </View>
-                            <Text style={styles.vazioTitulo}>
-                                {filtro === 'hoje' ? 'Nenhum sintoma hoje'
-                                    : filtro === 'semana' ? 'Nenhum sintoma esta semana'
-                                        : 'Nenhum sintoma'}
-                            </Text>
-                            <Text style={styles.vazioSub}>Toque em "+" para adicionar</Text>
+            {hideList !== 'true' && (
+                <>
+                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+                        <View style={styles.cardPerfil}>
+                            <TouchableOpacity onPress={() => router.push('/modulos/perfil' as any)} activeOpacity={0.85}>
+                                {perfilFoto ? (
+                                    <Image source={{ uri: perfilFoto }} style={styles.fotoPerfil} onError={() => setPerfilFoto(null)} />
+                                ) : (
+                                    <View style={styles.fotoPerfilPlaceholder}>
+                                        <Feather name="user" size={24} color="#9163CB" />
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                            <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
+                            <TouchableOpacity onPress={() => router.back()} style={styles.voltarBtn}>
+                                <Feather name="arrow-left" size={18} color="#6B49AD" />
+                            </TouchableOpacity>
                         </View>
-                    ) : (
-                        listaFiltrada.map((sint) => (
-                            <CardSintoma
-                                key={sint.id}
-                                sint={sint}
-                                onEditar={() => abrirModal(sint)}
-                                onExcluir={() => confirmarExcluir(sint.id)}
-                            />
-                        ))
-                    )}
-                </View>
-            </ScrollView>
+                        <LinearGradient
+                            colors={['#6B49AD', '#6843B1', '#481D94']}
+                            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                            style={styles.cardTituloLista}
+                        >
+                            <Text style={styles.cardTituloTexto}>SINTOMAS</Text>
+                        </LinearGradient>
+                        <View style={styles.filtrosRow}>
+                            {filtroOrdem.map((f) => (
+                                <TouchableOpacity
+                                    key={f}
+                                    onPress={() => setFiltro(f)}
+                                    activeOpacity={0.8}
+                                    style={[styles.chip, filtro === f && styles.chipAtivo]}
+                                >
+                                    {filtro === f ? (
+                                        <LinearGradient
+                                            colors={['#6B49AD', '#481D94']}
+                                            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                                            style={styles.chipGradient}
+                                        >
+                                            <Text style={styles.chipTextoAtivo}>{filtroLabels[f]}</Text>
+                                        </LinearGradient>
+                                    ) : (
+                                        <View style={styles.chipInner}>
+                                            <Text style={styles.chipTexto}>{filtroLabels[f]}</Text>
+                                        </View>
+                                    )}
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                        <View style={styles.cardLista}>
+                            {listaFiltrada.length === 0 ? (
+                                <View style={styles.vazioContainer}>
+                                    <View style={styles.vazioIcone}>
+                                        <Feather name="thermometer" size={36} color="#9163CB" />
+                                    </View>
+                                    <Text style={styles.vazioTitulo}>
+                                        {filtro === 'hoje' ? 'Nenhum sintoma hoje'
+                                            : filtro === 'semana' ? 'Nenhum sintoma esta semana'
+                                                : 'Nenhum sintoma'}
+                                    </Text>
+                                    <Text style={styles.vazioSub}>Toque em "+" para adicionar</Text>
+                                </View>
+                            ) : (
+                                listaFiltrada.map((sint) => (
+                                    <CardSintoma
+                                        key={sint.id}
+                                        sint={sint}
+                                        onEditar={() => abrirModal(sint)}
+                                        onExcluir={() => confirmarExcluir(sint.id)}
+                                    />
+                                ))
+                            )}
+                        </View>
+                    </ScrollView>
+                    <TouchableOpacity onPress={() => abrirModal()} activeOpacity={0.85} style={styles.fab}>
+                        <LinearGradient
+                            colors={['#6B49AD', '#481D94']}
+                            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                            style={styles.fabGradient}
+                        >
+                            <Feather name="plus" size={26} color="#fff" />
+                        </LinearGradient>
+                    </TouchableOpacity>
+                </>
+            )}
 
-            {/* FAB */}
-            <TouchableOpacity onPress={() => abrirModal()} activeOpacity={0.85} style={styles.fab}>
-                <LinearGradient
-                    colors={['#6B49AD', '#481D94']}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                    style={styles.fabGradient}
-                >
-                    <Feather name="plus" size={26} color="#fff" />
-                </LinearGradient>
-            </TouchableOpacity>
-
-            {/* Modal cadastro/edição */}
-            <Modal visible={modalVisivel} transparent animationType="none">
+            <Modal visible={modalVisivel} transparent animationType="none" onRequestClose={fecharModal}>
                 <KeyboardAvoidingView style={styles.modalFundo} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-                    <TouchableOpacity style={styles.modalOverlay} onPress={fecharModal} activeOpacity={1} />
+                    <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={fecharModal} />
                     <Animated.View style={[styles.modalCard, { transform: [{ translateY: slideAnim }] }]}>
                         <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                             <View style={styles.modalHandle} />
@@ -558,13 +554,10 @@ export default function Sintomas() {
                                     <Feather name="x" size={22} color="#9163CB" />
                                 </TouchableOpacity>
                             </View>
-
                             <Campo label="NOME DO SINTOMA" value={nome}
                                 onChangeText={(v) => { setNome(v); setErros(p => ({ ...p, nome: false })) }}
                                 placeholder="Ex: Dor de cabeça" erro={erros.nome} />
-
                             <PainScale value={intensidade} onChange={setIntensidade} />
-
                             <View style={styles.duasColunas}>
                                 <View style={styles.coluna}>
                                     <Campo label="DATA" value={data}
@@ -577,7 +570,6 @@ export default function Sintomas() {
                                         placeholder="08:00" keyboardType="numeric" opcional />
                                 </View>
                             </View>
-
                             <Campo label="DURAÇÃO" value={duracao} onChangeText={setDuracao}
                                 placeholder="Ex: 2 horas" opcional />
                             <Campo label="GATILHO" value={gatilho} onChangeText={setGatilho}
@@ -585,7 +577,6 @@ export default function Sintomas() {
                                 dica="O que pode ter causado este sintoma?" />
                             <Campo label="OBSERVAÇÕES" value={observacoes} onChangeText={setObservacoes}
                                 placeholder="Informações adicionais" opcional />
-
                             <TouchableOpacity onPress={salvar} disabled={carregando} activeOpacity={0.85} style={styles.botaoSalvarWrapper}>
                                 <LinearGradient
                                     colors={['#6B49AD', '#481D94']}
@@ -603,8 +594,7 @@ export default function Sintomas() {
                 </KeyboardAvoidingView>
             </Modal>
 
-            {/* Modal excluir */}
-            <Modal visible={modalExcluir} transparent animationType="fade">
+            <Modal visible={modalExcluir} transparent animationType="fade" onRequestClose={() => setModalExcluir(false)}>
                 <View style={styles.modalExcluirFundo}>
                     <View style={styles.modalExcluirCard}>
                         <View style={styles.modalExcluirIcone}>
@@ -632,7 +622,10 @@ export default function Sintomas() {
                 visivel={modalSucesso.visivel}
                 titulo={modalSucesso.titulo}
                 mensagem={modalSucesso.mensagem}
-                onFechar={() => setModalSucesso(m => ({ ...m, visivel: false }))}
+                onFechar={() => {
+                    setModalSucesso(m => ({ ...m, visivel: false }))
+                    if (modalVisivel) fecharModal()
+                }}
             />
         </SafeAreaView>
     )
@@ -644,7 +637,7 @@ const styles = StyleSheet.create({
     cardPerfil: {
         backgroundColor: '#fff', marginHorizontal: 16, marginTop: 16,
         borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10,
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between',
         shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.1, shadowRadius: 12, elevation: 5,
     },

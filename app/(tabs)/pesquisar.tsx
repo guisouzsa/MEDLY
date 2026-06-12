@@ -182,30 +182,29 @@ export default function Pesquisar() {
         </View>
 
         {/* Card 2 — Título */}
-        <LinearGradient
-          colors={['#6B49AD', '#6843B1', '#481D94']}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-          style={styles.cardTituloLista}
-        >
-          <Text style={styles.cardTituloTexto}>PESQUISAS</Text>
-        </LinearGradient>
+        <View style={styles.headerTitleBox}>
+          <Text style={styles.headerTitleText}>Pesquisar no Medly</Text>
+          <Text style={styles.headerSubText}>Encontre seus registros rapidamente</Text>
+        </View>
 
         {/* Caixa de pesquisa */}
-        <View style={styles.inputBox}>
-          <Feather name="search" size={20} color="#9163CB" />
-          <TextInput
-            style={styles.input}
-            value={busca}
-            onChangeText={setBusca}
-            placeholder="Digite para pesquisar..."
-            placeholderTextColor="#C4B5FD"
-            autoCorrect={false}
-          />
-          {busca.length > 0 && (
-            <TouchableOpacity onPress={() => setBusca('')}>
-              <Feather name="x" size={18} color="#9163CB" />
-            </TouchableOpacity>
-          )}
+        <View style={styles.inputContainer}>
+          <View style={styles.inputBox}>
+            <Feather name="search" size={20} color="#6B49AD" />
+            <TextInput
+              style={styles.input}
+              value={busca}
+              onChangeText={setBusca}
+              placeholder="Digite o que procura..."
+              placeholderTextColor="#A78BFA"
+              autoCorrect={false}
+            />
+            {busca.length > 0 && (
+              <TouchableOpacity onPress={() => setBusca('')} style={styles.clearBtn}>
+                <Feather name="x" size={16} color="#fff" />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* Filtros em linha horizontal scrollable */}
@@ -248,7 +247,7 @@ export default function Pesquisar() {
               return (
                 <View key={`${item.tipo}-${item.id}-${i}`} style={styles.card}>
                   <View style={[styles.cardIconeBox, { backgroundColor: cor.bg }]}>
-                    <Feather name={item.icone as any} size={22} color={cor.cor} />
+                    <Feather name={item.icone as any} size={24} color={cor.cor} />
                   </View>
                   <View style={styles.cardTextos}>
                     <View style={styles.cardTopo}>
@@ -263,6 +262,7 @@ export default function Pesquisar() {
                       <Text style={styles.cardSub}>{item.subtitulo}</Text>
                     ) : null}
                   </View>
+                  <Feather name="chevron-right" size={20} color="#D1D5DB" />
                 </View>
               )
             })}
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
   cardPerfil: {
     backgroundColor: '#fff', marginHorizontal: 0, marginTop: 0,
     borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between',
     shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1, shadowRadius: 12, elevation: 5,
     marginBottom: 14,
@@ -297,54 +297,51 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#E2D9F3',
   },
   logo: { width: 110, height: 36 },
-  
-  cardTituloLista: {
-    marginHorizontal: 0, marginTop: 0, borderRadius: 50,
-    paddingVertical: 14, alignItems: 'center',
-    shadowColor: '#481D94', shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2, shadowRadius: 8, elevation: 5,
-    marginBottom: 20,
+  headerTitleBox: {
+    marginBottom: 20, paddingHorizontal: 4,
   },
-  cardTituloTexto: { fontSize: 14, fontWeight: '800', color: '#fff', letterSpacing: 3 },
+  headerTitleText: {
+    fontSize: 26, fontWeight: '800', color: '#301971', marginBottom: 4,
+  },
+  headerSubText: {
+    fontSize: 15, color: '#9163CB', fontWeight: '600',
+  },
 
-  inputBox: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: '#fff', borderRadius: 20,
-    paddingHorizontal: 16, paddingVertical: 14,
-    borderWidth: 1.5, borderColor: '#E2D9F3',
-    shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.05, shadowRadius: 8, elevation: 3,
-    marginBottom: 16,
+  inputContainer: {
+    shadowColor: '#481D94', shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1, shadowRadius: 14, elevation: 8,
+    marginBottom: 24,
   },
-  input: { flex: 1, fontSize: 16, color: '#301971' },
+  inputBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#fff', borderRadius: 24,
+    paddingHorizontal: 20, paddingVertical: 16,
+    borderWidth: 1, borderColor: '#EDE8FA',
+  },
+  input: { flex: 1, fontSize: 16, color: '#301971', fontWeight: '500' },
+  clearBtn: {
+    backgroundColor: '#C4B5FD', padding: 4, borderRadius: 12,
+  },
 
   filtrosContainer: {
-    marginBottom: 20,
-    marginHorizontal: -16,
+    marginBottom: 24, marginHorizontal: -16,
   },
   filtrosScroll: {
-    paddingHorizontal: 16,
-    gap: 8,
+    paddingHorizontal: 16, gap: 10,
   },
   filtroPil: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#fff',
-    borderWidth: 1.5,
-    borderColor: '#E2D9F3',
-    borderRadius: 50,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#fff', borderWidth: 1, borderColor: '#EDE8FA',
+    borderRadius: 50, paddingHorizontal: 16, paddingVertical: 10,
+    shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
   },
   filtroPilAtivo: {
-    backgroundColor: '#6B49AD',
-    borderColor: '#6B49AD',
+    backgroundColor: '#6B49AD', borderColor: '#6B49AD',
+    shadowOpacity: 0.15, shadowRadius: 8, elevation: 4, shadowOffset: { width: 0, height: 4 },
   },
   filtroPilTexto: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#6B49AD',
+    fontSize: 14, fontWeight: '700', color: '#6B49AD',
   },
   filtroPilTextoAtivo: {
     color: '#fff',
@@ -362,23 +359,23 @@ const styles = StyleSheet.create({
   vazioSub: { fontSize: 14, color: '#9163CB' },
 
   card: {
-    backgroundColor: '#fff', borderRadius: 20,
-    padding: 16, flexDirection: 'row',
-    alignItems: 'center', gap: 14,
-    shadowColor: '#6B49AD',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.07, shadowRadius: 10, elevation: 4,
+    backgroundColor: '#fff', borderRadius: 24,
+    padding: 18, flexDirection: 'row',
+    alignItems: 'center', gap: 16,
+    shadowColor: '#481D94', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08, shadowRadius: 12, elevation: 4,
+    borderWidth: 1, borderColor: '#F5F0FF',
   },
   cardIconeBox: {
-    width: 52, height: 52, borderRadius: 16,
+    width: 56, height: 56, borderRadius: 20,
     justifyContent: 'center', alignItems: 'center',
   },
   cardTextos: { flex: 1, gap: 6 },
-  cardTopo: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  cardTitulo: { flex: 1, fontSize: 16, fontWeight: '700', color: '#301971' },
+  cardTopo: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  cardTitulo: { flex: 1, fontSize: 17, fontWeight: '800', color: '#301971' },
   tagTipo: {
-    borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4,
+    borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4,
   },
-  tagTipoTexto: { fontSize: 11, fontWeight: '700' },
-  cardSub: { fontSize: 13, color: '#6B49AD' },
+  tagTipoTexto: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
+  cardSub: { fontSize: 14, color: '#6B49AD', fontWeight: '500' },
 })

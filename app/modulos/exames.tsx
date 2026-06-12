@@ -361,7 +361,7 @@ function ModalVisualizarArquivo({
 // ─── Tela principal ───────────────────────────────────────────────────────────
 
 export default function Exames() {
-  const { action } = useLocalSearchParams()
+  const { action, hideList } = useLocalSearchParams()
 
   const [usuarioId, setUsuarioId] = useState<string | null>(null)
   const [lista, setLista] = useState<Exame[]>([])
@@ -517,7 +517,10 @@ export default function Exames() {
 
   function fecharModal() {
     Animated.timing(slideAnim, { toValue: height, duration: 280, useNativeDriver: true })
-      .start(() => setModalVisivel(false))
+      .start(() => {
+        setModalVisivel(false)
+        if (hideList === 'true') router.back()
+      })
   }
 
   // ── Validação ─────────────────────────────────────────────────────────────
@@ -631,7 +634,6 @@ export default function Exames() {
         await salvarHistorico(usuarioId, `Exame ${nome.trim()} foi cadastrado`)
       }
 
-      fecharModal()
       await buscar()
       await reagendarTodasNotificacoes(usuarioId!).catch(console.error)
       setModalSucesso({
@@ -674,106 +676,110 @@ export default function Exames() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+      {hideList !== 'true' && (
+        <>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
 
-        {/* Card Perfil */}
-        <View style={styles.cardPerfil}>
-          <TouchableOpacity onPress={() => router.push('/modulos/perfil' as any)} activeOpacity={0.85}>
-            {perfilFoto ? (
-              <Image source={{ uri: perfilFoto }} style={styles.fotoPerfil} onError={() => setPerfilFoto(null)} />
-            ) : (
-              <View style={styles.fotoPerfilPlaceholder}>
-                <Feather name="user" size={24} color="#9163CB" />
-              </View>
-            )}
-          </TouchableOpacity>
-          <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
-          <TouchableOpacity onPress={() => router.back()} style={styles.voltarBtn}>
-            <Feather name="arrow-left" size={18} color="#6B49AD" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Título */}
-        <LinearGradient
-          colors={['#6B49AD', '#6843B1', '#481D94']}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-          style={styles.cardTituloLista}
-        >
-          <Text style={styles.cardTituloTexto}>EXAMES</Text>
-        </LinearGradient>
-
-        {/* Filtros */}
-        <View style={styles.filtrosRow}>
-          {(['proximos', 'realizados', 'todos'] as Filtro[]).map((f) => (
-            <TouchableOpacity
-              key={f}
-              onPress={() => setFiltro(f)}
-              activeOpacity={0.8}
-              style={[styles.chip, filtro === f && styles.chipAtivo]}
-            >
-              {filtro === f ? (
-                <LinearGradient
-                  colors={['#6B49AD', '#481D94']}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={styles.chipGradient}
-                >
-                  <Text style={styles.chipTextoAtivo}>{filtroLabels[f]}</Text>
-                </LinearGradient>
-              ) : (
-                <View style={styles.chipInner}>
-                  <Text style={styles.chipTexto}>{filtroLabels[f]}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Lista */}
-        <View style={styles.cardLista}>
-          {listaFiltrada.length === 0 ? (
-            <View style={styles.vazioContainer}>
-              <View style={styles.vazioIcone}>
-                <Feather name="file-text" size={36} color="#9163CB" />
-              </View>
-              <Text style={styles.vazioTitulo}>
-                {filtro === 'proximos' ? 'Nenhum exame futuro'
-                  : filtro === 'realizados' ? 'Nenhum exame realizado'
-                  : 'Nenhum exame'}
-              </Text>
-              <Text style={styles.vazioSub}>Toque em "+" para adicionar</Text>
+            {/* Card Perfil */}
+            <View style={styles.cardPerfil}>
+              <TouchableOpacity onPress={() => router.push('/modulos/perfil' as any)} activeOpacity={0.85}>
+                {perfilFoto ? (
+                  <Image source={{ uri: perfilFoto }} style={styles.fotoPerfil} onError={() => setPerfilFoto(null)} />
+                ) : (
+                  <View style={styles.fotoPerfilPlaceholder}>
+                    <Feather name="user" size={24} color="#9163CB" />
+                  </View>
+                )}
+              </TouchableOpacity>
+              <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
+              <TouchableOpacity onPress={() => router.back()} style={styles.voltarBtn}>
+                <Feather name="arrow-left" size={18} color="#6B49AD" />
+              </TouchableOpacity>
             </View>
-          ) : (
-            listaFiltrada.map((exame) => (
-              <CardExame
-                key={exame.id}
-                exame={exame}
-                onEditar={() => abrirModal(exame)}
-                onExcluir={() => confirmarExcluir(exame.id)}
-                onVerArquivo={abrirVisualizador}
-              />
-            ))
-          )}
-        </View>
 
-      </ScrollView>
+            {/* Título */}
+            <LinearGradient
+              colors={['#6B49AD', '#6843B1', '#481D94']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={styles.cardTituloLista}
+            >
+              <Text style={styles.cardTituloTexto}>EXAMES</Text>
+            </LinearGradient>
 
-      {/* FAB fixo no canto inferior direito */}
-      <TouchableOpacity
-        onPress={() => abrirModal()}
-        activeOpacity={0.85}
-        style={styles.fab}
-      >
-        <LinearGradient
-          colors={['#6B49AD', '#481D94']}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={styles.fabGradient}
-        >
-          <Feather name="plus" size={26} color="#fff" />
-        </LinearGradient>
-      </TouchableOpacity>
+            {/* Filtros */}
+            <View style={styles.filtrosRow}>
+              {(['proximos', 'realizados', 'todos'] as Filtro[]).map((f) => (
+                <TouchableOpacity
+                  key={f}
+                  onPress={() => setFiltro(f)}
+                  activeOpacity={0.8}
+                  style={[styles.chip, filtro === f && styles.chipAtivo]}
+                >
+                  {filtro === f ? (
+                    <LinearGradient
+                      colors={['#6B49AD', '#481D94']}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                      style={styles.chipGradient}
+                    >
+                      <Text style={styles.chipTextoAtivo}>{filtroLabels[f]}</Text>
+                    </LinearGradient>
+                  ) : (
+                    <View style={styles.chipInner}>
+                      <Text style={styles.chipTexto}>{filtroLabels[f]}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Lista */}
+            <View style={styles.cardLista}>
+              {listaFiltrada.length === 0 ? (
+                <View style={styles.vazioContainer}>
+                  <View style={styles.vazioIcone}>
+                    <Feather name="file-text" size={36} color="#9163CB" />
+                  </View>
+                  <Text style={styles.vazioTitulo}>
+                    {filtro === 'proximos' ? 'Nenhum exame futuro'
+                      : filtro === 'realizados' ? 'Nenhum exame realizado'
+                      : 'Nenhum exame'}
+                  </Text>
+                  <Text style={styles.vazioSub}>Toque em "+" para adicionar</Text>
+                </View>
+              ) : (
+                listaFiltrada.map((exame) => (
+                  <CardExame
+                    key={exame.id}
+                    exame={exame}
+                    onEditar={() => abrirModal(exame)}
+                    onExcluir={() => confirmarExcluir(exame.id)}
+                    onVerArquivo={abrirVisualizador}
+                  />
+                ))
+              )}
+            </View>
+
+          </ScrollView>
+
+          {/* FAB fixo no canto inferior direito */}
+          <TouchableOpacity
+            onPress={() => abrirModal()}
+            activeOpacity={0.85}
+            style={styles.fab}
+          >
+            <LinearGradient
+              colors={['#6B49AD', '#481D94']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={styles.fabGradient}
+            >
+              <Feather name="plus" size={26} color="#fff" />
+            </LinearGradient>
+          </TouchableOpacity>
+        </>
+      )}
 
       {/* Modal cadastro/edição */}
-      <Modal visible={modalVisivel} transparent animationType="none">
+      <Modal visible={modalVisivel} transparent animationType="none" onRequestClose={fecharModal}>
         <KeyboardAvoidingView
           style={styles.modalFundo}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -898,7 +904,7 @@ export default function Exames() {
       </Modal>
 
       {/* Modal excluir */}
-      <Modal visible={modalExcluir} transparent animationType="fade">
+      <Modal visible={modalExcluir} transparent animationType="fade" onRequestClose={() => setModalExcluir(false)}>
         <View style={styles.modalExcluirFundo}>
           <View style={styles.modalExcluirCard}>
             <View style={styles.modalExcluirIcone}>
@@ -937,7 +943,10 @@ export default function Exames() {
         visivel={modalSucesso.visivel}
         titulo={modalSucesso.titulo}
         mensagem={modalSucesso.mensagem}
-        onFechar={() => setModalSucesso({ visivel: false, titulo: '', mensagem: '' })}
+        onFechar={() => {
+          setModalSucesso({ visivel: false, titulo: '', mensagem: '' })
+          if (modalVisivel) fecharModal()
+        }}
       />
 
     </SafeAreaView>
@@ -953,7 +962,7 @@ const styles = StyleSheet.create({
   cardPerfil: {
     backgroundColor: '#fff', marginHorizontal: 16, marginTop: 16,
     borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between',
     shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1, shadowRadius: 12, elevation: 5,
   },

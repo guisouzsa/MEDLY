@@ -10,7 +10,7 @@ type Props = {
 
 export default function ModalAlerta({ visivel, titulo, mensagem, onFechar }: Props) {
   return (
-    <Modal visible={visivel} transparent animationType="fade">
+    <Modal visible={visivel} transparent animationType="fade" onRequestClose={() => {}}>
       <View style={styles.fundo}>
         <View style={styles.card}>
           <Text style={styles.titulo}>{titulo}</Text>

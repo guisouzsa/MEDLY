@@ -26,6 +26,31 @@ import { supabase } from '../../src/lib/supabase'
 const { width } = Dimensions.get('window')
 const CARD_W = Math.min(width * 0.88, 420)
 
+function ModalSair({ visivel, onCancelar, onConfirmar }: { visivel: boolean; onCancelar: () => void; onConfirmar: () => void }) {
+  return (
+    <Modal visible={visivel} transparent animationType="fade" onRequestClose={() => {}}>
+      <View style={styles.modalFundoSair}>
+        <View style={styles.modalCardSair}>
+          <Text style={styles.modalTituloSair}>Sair da conta</Text>
+          <Text style={styles.modalMensagemSair}>Tem certeza que deseja sair? Você precisará fazer login novamente.</Text>
+          <TouchableOpacity onPress={onConfirmar} activeOpacity={0.85} style={styles.modalBotaoWrapperSair}>
+            <LinearGradient
+              colors={['#5E44A7', '#481D94', '#301971']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={styles.modalBotaoSair}
+            >
+              <Text style={styles.modalBotaoTextoSair}>SIM, SAIR</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={onCancelar} style={styles.modalBotaoCancelarSair}>
+            <Text style={styles.modalBotaoCancelarTextoSair}>Cancelar</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
 export default function Perfil() {
   const [usuarioId, setUsuarioId] = useState<string | null>(null)
   const [nome, setNome] = useState('')
@@ -36,6 +61,7 @@ export default function Perfil() {
   const [carregandoDados, setCarregandoDados] = useState(true)
   const [modal, setModal] = useState({ visivel: false, titulo: '', mensagem: '' })
   const [modalDeletarVisivel, setModalDeletarVisivel] = useState(false)
+  const [modalSairVisivel, setModalSairVisivel] = useState(false)
 
   function mostrarModal(titulo: string, mensagem: string) {
     setModal({ visivel: true, titulo, mensagem })
@@ -226,6 +252,12 @@ export default function Perfil() {
     }
   }
 
+  async function sair() {
+    setModalSairVisivel(false)
+    await supabase.auth.signOut()
+    router.replace('/auth')
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
@@ -317,6 +349,18 @@ export default function Perfil() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
+                  onPress={() => setModalSairVisivel(true)}
+                  activeOpacity={0.85}
+                  style={styles.botaoSairWrapper}
+                  disabled={carregando}
+                >
+                  <View style={styles.botaoSair}>
+                    <Feather name="log-out" size={16} color="#6B49AD" style={{ marginRight: 6 }} />
+                    <Text style={styles.botaoSairTexto}>SAIR DA CONTA</Text>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
                   onPress={confirmarDeletarConta}
                   activeOpacity={0.85}
                   style={styles.botaoDeletarWrapper}
@@ -337,7 +381,7 @@ export default function Perfil() {
         onFechar={() => setModal(m => ({ ...m, visivel: false }))}
       />
 
-      <Modal visible={modalDeletarVisivel} transparent animationType="fade">
+      <Modal visible={modalDeletarVisivel} transparent animationType="fade" onRequestClose={() => {}}>
         <View style={styles.modalFundoDeletar}>
           <View style={styles.modalDeletarCard}>
             <View style={styles.modalDeletarIcone}>
@@ -356,6 +400,7 @@ export default function Perfil() {
           </View>
         </View>
       </Modal>
+      <ModalSair visivel={modalSairVisivel} onCancelar={() => setModalSairVisivel(false)} onConfirmar={sair} />
     </SafeAreaView>
   )
 }
@@ -586,5 +631,91 @@ const styles = StyleSheet.create({
     color: '#6B49AD',
     fontSize: 14,
     fontWeight: '700',
+  },
+  // ── Botão sair ───────────────────────────────────────────────────────────────
+  botaoSairWrapper: {
+    marginTop: 14,
+    width: '100%',
+  },
+  botaoSair: {
+    borderRadius: 60,
+    borderWidth: 1.5,
+    borderColor: '#6B49AD',
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+  },
+  botaoSairTexto: {
+    color: '#6B49AD',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 2,
+  },
+
+  // ── Modal Sair ───────────────────────────────────────────────────────────────
+  modalFundoSair: {
+    flex: 1,
+    backgroundColor: '#00000066',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  modalCardSair: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 28,
+    width: '100%',
+    maxWidth: 340,
+    alignItems: 'center',
+    shadowColor: '#6B49AD',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  modalTituloSair: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#301971',
+    marginBottom: 10,
+    letterSpacing: 0.5,
+  },
+  modalMensagemSair: {
+    fontSize: 15,
+    color: '#6B49AD',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  modalBotaoWrapperSair: {
+    width: '100%',
+    shadowColor: '#301971',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+    marginBottom: 12,
+  },
+  modalBotaoSair: {
+    borderRadius: 60,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  modalBotaoTextoSair: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 2,
+  },
+  modalBotaoCancelarSair: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  modalBotaoCancelarTextoSair: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#9163CB',
   },
 })

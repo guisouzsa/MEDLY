@@ -13,10 +13,10 @@ import { supabase } from '../../src/lib/supabase'
 const { width } = Dimensions.get('window')
 
 const OPCOES = [
-  { label: 'Medicamento', icone: 'activity',    rota: '/modulos/medicamentos?action=create', colors: ['#F0EAFF', '#EDE8FA'], iconColor: '#6B49AD' },
-  { label: 'Consulta',    icone: 'calendar',    rota: '/modulos/consultas?action=create', colors: ['#E3F2FD', '#DBEAFE'], iconColor: '#1565C0' },
-  { label: 'Sintoma',     icone: 'thermometer', rota: '/modulos/sintomas?action=create', colors: ['#FFEBEE', '#FFCDD2'], iconColor: '#C62828' },
-  { label: 'Exame',       icone: 'file-text',   rota: '/modulos/exames?action=create', colors: ['#E0F2F1', '#B2DFDB'], iconColor: '#00695C' },
+  { label: 'Medicamento', descricao: 'Agendar e controlar', icone: 'activity', rota: '/modulos/medicamentos?action=create&hideList=true', colors: ['#6B49AD', '#481D94'], iconColor: '#fff', shadow: '#481D94' },
+  { label: 'Consulta',    descricao: 'Acompanhamento',      icone: 'calendar', rota: '/modulos/consultas?action=create&hideList=true',    colors: ['#2563EB', '#1D4ED8'], iconColor: '#fff', shadow: '#1D4ED8' },
+  { label: 'Sintoma',     descricao: 'Registrar histórico', icone: 'thermometer', rota: '/modulos/sintomas?action=create&hideList=true',  colors: ['#E11D48', '#BE123C'], iconColor: '#fff', shadow: '#BE123C' },
+  { label: 'Exame',       descricao: 'Marcar e resultados', icone: 'file-text', rota: '/modulos/exames?action=create&hideList=true',      colors: ['#059669', '#047857'], iconColor: '#fff', shadow: '#047857' },
 ]
 
 export default function Criar() {
@@ -82,19 +82,25 @@ export default function Criar() {
           {OPCOES.map((op) => (
             <TouchableOpacity
               key={op.label}
-              style={styles.botao}
+              style={styles.botaoWrapper}
               onPress={() => router.push(op.rota as any)}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
             >
               <LinearGradient
                 colors={op.colors as [string, string]}
-                style={styles.iconeBox}
+                style={styles.botaoFundo}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
               >
-                <Feather name={op.icone as any} size={36} color={op.iconColor} />
+                <View style={styles.botaoIconeWrapper}>
+                  <Feather name={op.icone as any} size={32} color={op.iconColor} />
+                </View>
+                <View style={styles.botaoTextos}>
+                  <Text style={styles.botaoLabel}>{op.label}</Text>
+                  <Text style={styles.botaoDesc}>{op.descricao}</Text>
+                </View>
+                <Feather name="chevron-right" size={20} color="rgba(255,255,255,0.6)" style={{ position: 'absolute', bottom: 20, right: 20 }} />
               </LinearGradient>
-              <Text style={styles.botaoLabel}>{op.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -116,7 +122,7 @@ const styles = StyleSheet.create({
   cardPerfil: {
     backgroundColor: '#fff', marginHorizontal: 0, marginTop: 0,
     borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between',
     shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1, shadowRadius: 12, elevation: 5,
     marginBottom: 20,
@@ -129,17 +135,17 @@ const styles = StyleSheet.create({
   logo: { width: 110, height: 36 },
 
   tituloSecao: {
-    marginBottom: 24,
+    marginBottom: 20,
     paddingHorizontal: 4,
   },
   titulo: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '800',
     color: '#301971',
     marginBottom: 4,
   },
   subtitulo: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#9163CB',
     fontWeight: '600',
   },
@@ -149,40 +155,46 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    alignContent: 'stretch',
-    gap: 12,
+    alignContent: 'flex-start',
+    gap: 16,
     paddingBottom: 24,
   },
-  botao: {
-    width: '48%',
-    height: '47%',
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#6B49AD',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: '#EDE8FA',
+  botaoWrapper: {
+    width: '47%',
+    height: 180,
+    borderRadius: 28,
+    shadowColor: '#481D94',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
   },
-  iconeBox: {
-    width: 88,
-    height: 88,
-    borderRadius: 30,
+  botaoFundo: {
+    flex: 1,
+    borderRadius: 28,
+    padding: 20,
+    justifyContent: 'space-between',
+  },
+  botaoIconeWrapper: {
+    width: 56,
+    height: 56,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+  },
+  botaoTextos: {
+    marginTop: 'auto',
   },
   botaoLabel: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '800',
-    color: '#301971',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  botaoDesc: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '500',
   },
 })

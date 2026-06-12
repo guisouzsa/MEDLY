@@ -196,7 +196,6 @@ async function agendarMedicamento(med: MedicamentoParaNotificar): Promise<number
           sound: 'default',
           categoryIdentifier: CATEGORIA_MEDICAMENTO,
           data: { tipo: 'medicamento', id: med.id },
-          ...(Platform.OS === 'android' ? { channelId: CANAL_LEMBRETES } : {}),
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -296,7 +295,6 @@ async function agendarConsulta(consulta: ConsultaParaNotificar): Promise<number>
       sound: 'default',
       categoryIdentifier: CATEGORIA_CONSULTA,
       data: { tipo: 'consulta', id: consulta.id },
-      ...(Platform.OS === 'android' ? { channelId: CANAL_LEMBRETES } : {}),
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -349,7 +347,6 @@ async function agendarExame(exame: ExameParaNotificar): Promise<number> {
       sound: 'default',
       categoryIdentifier: CATEGORIA_EXAME,
       data: { tipo: 'exame', id: exame.id },
-      ...(Platform.OS === 'android' ? { channelId: CANAL_LEMBRETES } : {}),
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
