@@ -244,14 +244,14 @@ export default function Dashboard() {
       >
         {/* CARD 1 — header */}
         <View style={styles.card1}>
-          <View style={{ width: 48 }} />
+          <View style={{ width: 44 }} />
           <Image source={require('../../assets/images/logo.png')} style={styles.logoHeader} resizeMode="contain" />
           <TouchableOpacity onPress={() => router.push('/modulos/perfil' as any)} activeOpacity={0.85}>
             {fotoUri ? (
               <Image source={{ uri: fotoUri }} style={styles.fotoPerfil} onError={() => setFotoUri(null)} />
             ) : (
               <View style={styles.fotoPerfilPlaceholder}>
-                <Feather name="user" size={22} color="#6B49AD" />
+                <Feather name="user" size={24} color="#9163CB" />
               </View>
             )}
           </TouchableOpacity>
@@ -339,10 +339,11 @@ const styles = StyleSheet.create({
       }
     })
   },
-  fotoPerfil: { width: 48, height: 48, borderRadius: 24 },
+  fotoPerfil: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#E2D9F3' },
   fotoPerfilPlaceholder: {
-    width: 48, height: 48, borderRadius: 24,
+    width: 44, height: 44, borderRadius: 22,
     backgroundColor: '#EDE8FA', justifyContent: 'center', alignItems: 'center',
+    borderWidth: 2, borderColor: '#E2D9F3',
   },
   logoHeader: { width: 100, height: 36 },
 
