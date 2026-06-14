@@ -433,7 +433,7 @@ export default function TelaCalendario() {
           ))}
         </View>
 
-        <View style={{ height: 80 }} />
+        <View style={{ height: 160 }} />
       </ScrollView>
     </SafeAreaView>
   )
@@ -567,7 +567,7 @@ const styles = StyleSheet.create({
   accordionContent: {
     backgroundColor: '#FAFAFE', borderWidth: 1, borderTopWidth: 0,
     borderColor: '#EDE8FA', borderBottomLeftRadius: 16, borderBottomRightRadius: 16,
-    padding: 8, gap: 6,
+    padding: 8, gap: 12,
   },
 
   registroItem: {
