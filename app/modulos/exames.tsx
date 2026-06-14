@@ -3,7 +3,7 @@ import { BlurView } from 'expo-blur'
 import { LinearGradient } from 'expo-linear-gradient'
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router'
 import * as DocumentPicker from 'expo-document-picker'
-import * as FileSystem from 'expo-file-system'
+import * as FileSystem from 'expo-file-system/legacy'
 import { decode } from 'base64-arraybuffer'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -902,7 +902,8 @@ export default function Exames() {
 
       {/* Modal excluir */}
       <Modal visible={modalExcluir} transparent animationType="fade" onRequestClose={() => setModalExcluir(false)}>
-        <View style={styles.modalExcluirFundo}>
+        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} />
+        <View style={[styles.modalExcluirFundo, { backgroundColor: 'transparent' }]}>
           <View style={styles.modalExcluirCard}>
             <View style={styles.modalExcluirIcone}>
               <Feather name="trash-2" size={32} color="#dc2626" />

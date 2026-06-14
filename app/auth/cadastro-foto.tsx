@@ -1,17 +1,21 @@
 import { Feather } from '@expo/vector-icons'
-import { decode } from 'base64-arraybuffer'
-import * as FileSystem from 'expo-file-system'
 import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
 import { router } from 'expo-router'
 import { useState } from 'react'
 import {
-  Dimensions, Image, Platform,
+  Dimensions, Image,
   ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import ModalAlerta from '../../src/components/ModalAlerta'
 import { useCadastro } from '../../src/context/CadastroContext'
+import {
+  extensionFromUri,
+  mimeFromExtension,
+  mimeFromUri,
+  readUriAsArrayBuffer,
+} from '../../src/lib/storage'
 import { supabase } from '../../src/lib/supabase'
 
 const { width } = Dimensions.get('window')
@@ -42,8 +46,10 @@ export default function CadastroFoto() {
     if (carregando) return
     setCarregando(true)
 
+    const email = dados.email.trim().replace(/[^a-zA-Z0-9@._+-]/g, '')
+
     const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: dados.email.trim().replace(/[^a-zA-Z0-9@._+-]/g, ''),
+      email,
       password: dados.senha,
       options: { data: { nome: dados.nome.trim() } },
     })
@@ -73,7 +79,16 @@ export default function CadastroFoto() {
       return
     }
 
-    const user = authData.session?.user ?? authData.user
+    let session = authData.session
+    if (!session) {
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: dados.senha,
+      })
+      if (!signInError) session = signInData.session
+    }
+
+    const user = session?.user ?? authData.user
     if (!user) {
       setCarregando(false)
       mostrarModal('Erro no servidor', 'Ocorreu um problema. Tente novamente em alguns instantes.')
@@ -84,36 +99,23 @@ export default function CadastroFoto() {
 
     if (dados.fotoUri && !pularFoto) {
       try {
-        let fileName = ''
-        let uploadData: any
-        let contentType = 'image/jpeg'
+        const uploadData = await readUriAsArrayBuffer(dados.fotoUri)
+        const contentType = await mimeFromUri(dados.fotoUri)
+        const ext = extensionFromUri(dados.fotoUri, mimeFromExtension(contentType.split('/')[1] ?? 'jpg'))
+        const fileName = `${user.id}.${ext}`
 
-        if (Platform.OS === 'web') {
-          const response = await fetch(dados.fotoUri)
-          const blob = await response.blob()
-          const ext = blob.type.split('/')[1] ?? 'jpg'
-          fileName = `${user.id}.${ext}`
-          uploadData = blob
-          contentType = blob.type
-        } else {
-          const parts = dados.fotoUri.split('.')
-          const extRaw = parts.length > 1 ? parts.pop()?.toLowerCase() : 'jpg'
-          const ext = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extRaw || '') ? extRaw : 'jpg'
-          fileName = `${user.id}.${ext}`
-          const base64 = await FileSystem.readAsStringAsync(dados.fotoUri, { encoding: FileSystem.EncodingType.Base64 })
-          uploadData = decode(base64)
-          contentType = `image/${ext === 'jpg' ? 'jpeg' : ext}`
-        }
-
-        const { data: upload, error: uploadError } = await supabase.storage.from('avatares')
+        const { data: upload, error: uploadError } = await supabase.storage
+          .from('avatares')
           .upload(fileName, uploadData, { contentType, upsert: true })
 
-        if (upload) {
+        if (uploadError) {
+          console.error('Erro upload cadastro:', uploadError.message)
+        } else if (upload) {
           const { data: urlData } = supabase.storage.from('avatares').getPublicUrl(fileName)
           fotoUrl = `${urlData.publicUrl}?t=${Date.now()}`
         }
       } catch (e) {
-        console.log('CATCH UPLOAD:', e)
+        console.error('CATCH UPLOAD cadastro:', e)
       }
     }
 

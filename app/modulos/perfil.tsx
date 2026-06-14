@@ -1,5 +1,7 @@
 import { Feather } from '@expo/vector-icons'
-import * as FileSystem from 'expo-file-system'
+import { BlurView } from 'expo-blur'
+
+import * as FileSystem from 'expo-file-system/legacy'
 import * as ImagePicker from 'expo-image-picker'
 import { decode } from 'base64-arraybuffer'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -29,7 +31,8 @@ const CARD_W = Math.min(width * 0.88, 420)
 function ModalSair({ visivel, onCancelar, onConfirmar }: { visivel: boolean; onCancelar: () => void; onConfirmar: () => void }) {
   return (
     <Modal visible={visivel} transparent animationType="fade" onRequestClose={() => {}}>
-      <View style={styles.modalFundoSair}>
+      <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} />
+      <View style={[styles.modalFundoSair, { backgroundColor: 'transparent' }]}>
         <View style={styles.modalCardSair}>
           <Text style={styles.modalTituloSair}>Sair da conta</Text>
           <Text style={styles.modalMensagemSair}>Tem certeza que deseja sair? Você precisará fazer login novamente.</Text>
@@ -382,7 +385,8 @@ export default function Perfil() {
       />
 
       <Modal visible={modalDeletarVisivel} transparent animationType="fade" onRequestClose={() => {}}>
-        <View style={styles.modalFundoDeletar}>
+        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} />
+        <View style={[styles.modalFundoDeletar, { backgroundColor: 'transparent' }]}>
           <View style={styles.modalDeletarCard}>
             <View style={styles.modalDeletarIcone}>
               <Feather name="alert-triangle" size={32} color="#dc2626" />

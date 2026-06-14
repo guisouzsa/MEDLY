@@ -1064,7 +1064,8 @@ export default function Medicamentos() {
 
       {/* Modal excluir */}
       <Modal visible={modalExcluir} transparent animationType="fade" onRequestClose={() => {}}>
-        <View style={styles.modalExcluirFundo}>
+        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} />
+        <View style={[styles.modalExcluirFundo, { backgroundColor: 'transparent' }]}>
           <View style={styles.modalExcluirCard}>
             <View style={styles.modalExcluirIcone}>
               <Feather name="trash-2" size={32} color="#dc2626" />
@@ -1083,7 +1084,8 @@ export default function Medicamentos() {
 
       {/* Modal pausar */}
       <Modal visible={modalPausar} transparent animationType="fade" onRequestClose={() => {}}>
-        <View style={styles.modalCentroFundo}>
+        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} />
+        <View style={[styles.modalCentroFundo, { backgroundColor: 'transparent' }]}>
           <View style={styles.modalCentroCard}>
             <LinearGradient
               colors={['#6B49AD', '#481D94']}

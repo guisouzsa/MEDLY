@@ -598,7 +598,8 @@ export default function Sintomas() {
             </Modal>
 
             <Modal visible={modalExcluir} transparent animationType="fade" onRequestClose={() => setModalExcluir(false)}>
-                <View style={styles.modalExcluirFundo}>
+                <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} />
+                <View style={[styles.modalExcluirFundo, { backgroundColor: 'transparent' }]}>
                     <View style={styles.modalExcluirCard}>
                         <View style={styles.modalExcluirIcone}>
                             <Feather name="trash-2" size={32} color="#dc2626" />

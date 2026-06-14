@@ -48,8 +48,7 @@
         {
           "photosPermission": "Permita que o MEDLY acesse suas fotos para selecionar sua foto de perfil."
         }
-      ],
-      "expo-image"
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
