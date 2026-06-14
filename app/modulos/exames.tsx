@@ -3,8 +3,7 @@ import { BlurView } from 'expo-blur'
 import { LinearGradient } from 'expo-linear-gradient'
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router'
 import * as DocumentPicker from 'expo-document-picker'
-import * as FileSystem from 'expo-file-system/legacy'
-import { decode } from 'base64-arraybuffer'
+import { readUriAsArrayBuffer, mimeFromExtension } from '../../src/lib/storage'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Animated, Dimensions, Image, KeyboardAvoidingView, Modal,
@@ -293,23 +292,37 @@ function ModalVisualizarArquivo({
 }) {
   return (
     <Modal visible={visivel} transparent animationType="fade" statusBarTranslucent>
+      <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} experimentalBlurMethod="dimezisBlurView" />
+      <LinearGradient
+        colors={['rgba(26, 10, 61, 0.85)', 'rgba(48, 25, 113, 0.85)']}
+        style={StyleSheet.absoluteFillObject}
+      />
       <View style={styles.viewerFundo}>
         <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
           {/* Header */}
           <View style={styles.viewerHeader}>
-            <TouchableOpacity onPress={onFechar} style={styles.viewerFechar} activeOpacity={0.8}>
-              <Feather name="x" size={22} color="#fff" />
+            <TouchableOpacity onPress={onFechar} style={styles.viewerVoltarBtn} activeOpacity={0.8}>
+              <Feather name="arrow-left" size={16} color="#fff" style={{ marginRight: 4 }} />
+              <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>Voltar</Text>
             </TouchableOpacity>
+
             <Text style={styles.viewerTitulo} numberOfLines={1}>
-              {isImage ? 'Imagem' : 'Documento'}
+              {isImage ? 'Visualizar imagem' : 'Visualizar arquivo'}
             </Text>
-            <TouchableOpacity
-              onPress={() => import('expo-web-browser').then(wb => wb.openBrowserAsync(url))}
-              style={styles.viewerAbrirExterno}
-              activeOpacity={0.8}
-            >
-              <Feather name="external-link" size={20} color="#fff" />
-            </TouchableOpacity>
+
+            <View style={styles.viewerRightContainer}>
+              <TouchableOpacity
+                onPress={() => import('expo-web-browser').then(wb => wb.openBrowserAsync(url))}
+                style={styles.viewerAbrirExterno}
+                activeOpacity={0.8}
+              >
+                <Feather name="external-link" size={18} color="#fff" />
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={onFechar} style={styles.viewerFechar} activeOpacity={0.8}>
+                <Feather name="x" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Conteúdo */}
@@ -583,22 +596,14 @@ export default function Exames() {
 
       if (arquivoLocal) {
         const { uri, nome: nomeArq, ext } = arquivoLocal
-        const fileContent = await FileSystem.readAsStringAsync(uri, {
-          encoding: FileSystem.EncodingType.Base64,
-        })
+        const uploadData = await readUriAsArrayBuffer(uri)
 
         const fileName = `${usuarioId}_${Date.now()}.${ext}`
-
-        let contentType = 'application/octet-stream'
-        if (ext === 'pdf') {
-          contentType = 'application/pdf'
-        } else if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
-          contentType = `image/${ext === 'jpg' ? 'jpeg' : ext}`
-        }
+        const contentType = mimeFromExtension(ext)
 
         const { error: uploadError } = await supabase.storage
           .from('exames_arquivos')
-          .upload(fileName, decode(fileContent), { contentType, upsert: true })
+          .upload(fileName, uploadData, { contentType, upsert: true })
 
         if (uploadError) throw new Error('Falha no upload do arquivo.')
 
@@ -779,7 +784,7 @@ export default function Exames() {
           style={styles.modalFundo}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <BlurView intensity={40} tint="dark" style={styles.modalOverlay}>
+          <BlurView intensity={40} tint="dark" style={styles.modalOverlay} experimentalBlurMethod="dimezisBlurView">
             <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={fecharModal} />
           </BlurView>
           <Animated.View style={[styles.modalCard, { transform: [{ translateY: slideAnim }] }]}>
@@ -902,7 +907,7 @@ export default function Exames() {
 
       {/* Modal excluir */}
       <Modal visible={modalExcluir} transparent animationType="fade" onRequestClose={() => setModalExcluir(false)}>
-        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} />
+        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} experimentalBlurMethod="dimezisBlurView" />
         <View style={[styles.modalExcluirFundo, { backgroundColor: 'transparent' }]}>
           <View style={styles.modalExcluirCard}>
             <View style={styles.modalExcluirIcone}>
@@ -1214,26 +1219,46 @@ const styles = StyleSheet.create({
   // ── Visualizador de arquivo ───────────────────────────────────────────────
   viewerFundo: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: 'transparent',
   },
   viewerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 14,
-    gap: 12,
+  },
+  viewerVoltarBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(107, 73, 173, 0.4)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    minWidth: 80,
+    justifyContent: 'center',
+  },
+  viewerRightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   viewerFechar: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(107, 73, 173, 0.4)',
     justifyContent: 'center', alignItems: 'center',
   },
   viewerTitulo: {
-    flex: 1, fontSize: 16, fontWeight: '700', color: '#fff', textAlign: 'center',
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+    textAlign: 'center',
+    marginHorizontal: 8,
   },
   viewerAbrirExterno: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(107, 73, 173, 0.4)',
     justifyContent: 'center', alignItems: 'center',
   },
   viewerConteudo: {
