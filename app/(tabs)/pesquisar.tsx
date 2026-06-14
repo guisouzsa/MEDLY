@@ -2,10 +2,10 @@ import { Feather } from '@expo/vector-icons'
 import { BlurView } from 'expo-blur'
 import { LinearGradient } from 'expo-linear-gradient'
 import { router, useFocusEffect } from 'expo-router'
-import * as WebBrowser from 'expo-web-browser'
 import { useCallback, useState } from 'react'
 import {
   ActivityIndicator,
+  Dimensions,
   Image,
   Modal,
   ScrollView,
@@ -14,6 +14,8 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '../../src/lib/supabase'
+
+const { height, width } = Dimensions.get('window')
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -34,13 +36,6 @@ const FILTROS: { label: string, valor: TipoFiltro, icone: string }[] = [
   { label: 'Sintomas', valor: 'sintomas', icone: 'thermometer' },
   { label: 'Exames', valor: 'exames', icone: 'file-text' },
 ]
-
-const COR_TIPO: Record<string, { bg: string, cor: string }> = {
-  medicamentos: { bg: '#EDE8FA', cor: '#6B49AD' },
-  consultas: { bg: '#DBEAFE', cor: '#1D4ED8' },
-  sintomas: { bg: '#FEF9C3', cor: '#CA8A04' },
-  exames: { bg: '#DCFCE7', cor: '#16A34A' },
-}
 
 const DIAS_SEMANA_LABEL = [
   { label: 'Seg', valor: 1 }, { label: 'Ter', valor: 2 },
@@ -113,10 +108,104 @@ function jaPassouExame(exame: any): boolean {
 function isImageUrl(url: string) {
   if (!url) return false
   const u = url.toLowerCase()
-  return u.includes('.png') || u.includes('.jpg') || u.includes('.jpeg') || u.includes('.gif') || u.includes('.webp')
+  return (
+    u.includes('.png') || u.includes('.jpg') || u.includes('.jpeg') ||
+    u.includes('.gif') || u.includes('.webp') ||
+    u.startsWith('data:image') ||
+    u.startsWith('ph://') ||
+    u.startsWith('assets-library://')
+  )
 }
 
-// ─── Cards copiados das telas originais ──────────────────────────────────────
+// ─── Modal visualizador de arquivo ───────────────────────────────────────────
+
+function ModalVisualizarArquivo({
+  visivel,
+  url,
+  isImage,
+  onFechar,
+}: {
+  visivel: boolean
+  url: string
+  isImage: boolean
+  onFechar: () => void
+}) {
+  return (
+    <Modal visible={visivel} transparent animationType="fade" statusBarTranslucent>
+      <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} experimentalBlurMethod="dimezisBlurView" />
+      <LinearGradient
+        colors={['rgba(26, 10, 61, 0.85)', 'rgba(48, 25, 113, 0.85)']}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <View style={styles.viewerFundo}>
+        <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+          {/* Header */}
+          <View style={styles.viewerHeader}>
+            <TouchableOpacity onPress={onFechar} style={styles.viewerVoltarBtn} activeOpacity={0.8}>
+              <Feather name="arrow-left" size={16} color="#fff" style={{ marginRight: 4 }} />
+              <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>Voltar</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.viewerTitulo} numberOfLines={1}>
+              {isImage ? 'Visualizar imagem' : 'Visualizar arquivo'}
+            </Text>
+
+            <View style={styles.viewerRightContainer}>
+              <TouchableOpacity
+                onPress={() => import('expo-web-browser').then(wb => wb.openBrowserAsync(url))}
+                style={styles.viewerAbrirExterno}
+                activeOpacity={0.8}
+              >
+                <Feather name="external-link" size={18} color="#fff" />
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={onFechar} style={styles.viewerFechar} activeOpacity={0.8}>
+                <Feather name="x" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Conteúdo */}
+          <View style={styles.viewerConteudo}>
+            {isImage ? (
+              <Image
+                source={{ uri: url }}
+                style={styles.viewerImagem}
+                resizeMode="contain"
+              />
+            ) : (
+              <View style={styles.viewerPdfContainer}>
+                <View style={styles.viewerPdfIcone}>
+                  <Feather name="file-text" size={64} color="#dc2626" />
+                  <Text style={styles.viewerPdfLabel}>PDF</Text>
+                </View>
+                <Text style={styles.viewerPdfTexto}>
+                  Visualização de PDF disponível no navegador externo
+                </Text>
+                <TouchableOpacity
+                  onPress={() => import('expo-web-browser').then(wb => wb.openBrowserAsync(url))}
+                  activeOpacity={0.85}
+                  style={styles.viewerPdfBotao}
+                >
+                  <LinearGradient
+                    colors={['#6B49AD', '#481D94']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                    style={styles.viewerPdfBotaoGradient}
+                  >
+                    <Feather name="external-link" size={16} color="#fff" />
+                    <Text style={styles.viewerPdfBotaoTexto}>Abrir PDF</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </SafeAreaView>
+      </View>
+    </Modal>
+  )
+}
+
+// ─── Cards ────────────────────────────────────────────────────────────────────
 
 function CardMedicamento({ dados }: { dados: any }) {
   const [expandido, setExpandido] = useState(false)
@@ -160,7 +249,6 @@ function CardMedicamento({ dados }: { dados: any }) {
 
   const ht = horariosTexto()
   const dt = diasTexto()
-
   const temDetalhes = !!(dados.quantidade_por_dose || ht || dt || dados.data_termino || dados.data_retorno || dados.motivo_encerramento || dados.observacoes)
 
   return (
@@ -331,18 +419,15 @@ function CardConsulta({ dados }: { dados: any }) {
   )
 }
 
-function CardExame({ dados }: { dados: any }) {
+// ── CardExame agora recebe onVerArquivo ao invés de abrir WebBrowser direto ──
+
+function CardExame({ dados, onVerArquivo }: {
+  dados: any
+  onVerArquivo: (url: string, isImage: boolean) => void
+}) {
   const [expandido, setExpandido] = useState(false)
   const isFuturo = !jaPassouExame(dados)
   const temDetalhes = !!(dados.data_resultado || dados.arquivo_url)
-
-  async function abrirArquivo(url: string) {
-    try {
-      await WebBrowser.openBrowserAsync(url)
-    } catch (err) {
-      console.log('Erro ao abrir arquivo:', err)
-    }
-  }
 
   return (
     <View style={styles.card}>
@@ -384,7 +469,11 @@ function CardExame({ dados }: { dados: any }) {
             </View>
           ) : null}
           {dados.arquivo_url ? (
-            <TouchableOpacity onPress={() => abrirArquivo(dados.arquivo_url)} activeOpacity={0.75} style={styles.btnArquivoCard}>
+            <TouchableOpacity
+              onPress={() => onVerArquivo(dados.arquivo_url!, isImageUrl(dados.arquivo_url!))}
+              activeOpacity={0.75}
+              style={styles.btnArquivoCard}
+            >
               <View style={styles.btnArquivoCardIcone}>
                 {isImageUrl(dados.arquivo_url) ? (
                   <Feather name="image" size={16} color="#6B49AD" />
@@ -392,7 +481,9 @@ function CardExame({ dados }: { dados: any }) {
                   <Feather name="file-text" size={16} color="#dc2626" />
                 )}
               </View>
-              <Text style={styles.btnArquivoCardTexto}>{isImageUrl(dados.arquivo_url) ? 'Ver imagem' : 'Ver PDF'}</Text>
+              <Text style={styles.btnArquivoCardTexto}>
+                {isImageUrl(dados.arquivo_url) ? 'Ver imagem' : 'Ver PDF'}
+              </Text>
               <Feather name="external-link" size={14} color="#6B49AD" style={{ marginLeft: 'auto' }} />
             </TouchableOpacity>
           ) : null}
@@ -489,6 +580,17 @@ export default function Pesquisar() {
   const [carregando, setCarregando] = useState(false)
   const [perfilFoto, setPerfilFoto] = useState<string | null>(null)
   const [modalFiltroVisivel, setModalFiltroVisivel] = useState(false)
+
+  // ── Viewer de arquivo ────────────────────────────────────────────────────
+  const [viewerVisivel, setViewerVisivel] = useState(false)
+  const [viewerUrl, setViewerUrl] = useState('')
+  const [viewerIsImage, setViewerIsImage] = useState(false)
+
+  function abrirVisualizador(url: string, isImage: boolean) {
+    setViewerUrl(url)
+    setViewerIsImage(isImage)
+    setViewerVisivel(true)
+  }
 
   useFocusEffect(
     useCallback(() => {
@@ -587,7 +689,13 @@ export default function Pesquisar() {
   function renderCard(item: Item) {
     if (item.tipo === 'medicamentos') return <CardMedicamento key={`med-${item.id}`} dados={item.dados} />
     if (item.tipo === 'consultas') return <CardConsulta key={`con-${item.id}`} dados={item.dados} />
-    if (item.tipo === 'exames') return <CardExame key={`exa-${item.id}`} dados={item.dados} />
+    if (item.tipo === 'exames') return (
+      <CardExame
+        key={`exa-${item.id}`}
+        dados={item.dados}
+        onVerArquivo={abrirVisualizador}
+      />
+    )
     if (item.tipo === 'sintomas') return <CardSintoma key={`sin-${item.id}`} dados={item.dados} />
     return null
   }
@@ -749,6 +857,14 @@ export default function Pesquisar() {
           </View>
         </View>
       </Modal>
+
+      {/* Modal visualizador de arquivo */}
+      <ModalVisualizarArquivo
+        visivel={viewerVisivel}
+        url={viewerUrl}
+        isImage={viewerIsImage}
+        onFechar={() => setViewerVisivel(false)}
+      />
     </SafeAreaView>
   )
 }
@@ -793,25 +909,15 @@ const styles = StyleSheet.create({
 
   // Botão filtro compacto
   botaoEscolherFiltro: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: '#6B49AD',
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    marginBottom: 20,
-    gap: 6,
+    flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start',
+    backgroundColor: '#6B49AD', borderRadius: 999,
+    paddingHorizontal: 14, paddingVertical: 8, marginBottom: 20, gap: 6,
   },
   botaoFiltroTexto: { fontSize: 13, fontWeight: '700', color: '#fff' },
   filtrosBadge: {
-    backgroundColor: '#fff',
-    borderRadius: 999,
-    minWidth: 18,
-    height: 18,
-    paddingHorizontal: 5,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: '#fff', borderRadius: 999,
+    minWidth: 18, height: 18, paddingHorizontal: 5,
+    justifyContent: 'center', alignItems: 'center',
   },
   filtrosBadgeTexto: { fontSize: 10, fontWeight: '800', color: '#6B49AD' },
 
@@ -928,9 +1034,7 @@ const styles = StyleSheet.create({
   },
   checkboxAtivo: { backgroundColor: '#6B49AD', borderColor: '#6B49AD' },
 
-  btnLimparFiltros: {
-    alignItems: 'center', paddingVertical: 10, marginTop: 4,
-  },
+  btnLimparFiltros: { alignItems: 'center', paddingVertical: 10, marginTop: 4 },
   btnLimparFiltrosTexto: { fontSize: 14, color: '#9163CB', fontWeight: '600' },
 
   btnAplicarFiltros: {
@@ -940,4 +1044,56 @@ const styles = StyleSheet.create({
   },
   btnAplicarGradient: { borderRadius: 999, paddingVertical: 16, alignItems: 'center' },
   btnAplicarTexto: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 2 },
+
+  // ── Visualizador de arquivo ───────────────────────────────────────────────
+  viewerFundo: { flex: 1, backgroundColor: 'transparent' },
+  viewerHeader: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14,
+  },
+  viewerVoltarBtn: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'rgba(107, 73, 173, 0.4)',
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+    minWidth: 80, justifyContent: 'center',
+  },
+  viewerRightContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  viewerFechar: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(107, 73, 173, 0.4)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  viewerTitulo: {
+    flex: 1, fontSize: 16, fontWeight: '700',
+    color: '#fff', textAlign: 'center', marginHorizontal: 8,
+  },
+  viewerAbrirExterno: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(107, 73, 173, 0.4)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  viewerConteudo: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  viewerImagem: { width: width, height: height * 0.75 },
+  viewerPdfContainer: { alignItems: 'center', padding: 32, gap: 20 },
+  viewerPdfIcone: {
+    width: 120, height: 120, borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  viewerPdfLabel: {
+    fontSize: 11, fontWeight: '800', color: '#dc2626', marginTop: 6, letterSpacing: 2,
+  },
+  viewerPdfTexto: {
+    fontSize: 15, color: 'rgba(255,255,255,0.7)', textAlign: 'center', lineHeight: 22,
+  },
+  viewerPdfBotao: {
+    borderRadius: 999,
+    shadowColor: '#481D94', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4, shadowRadius: 10, elevation: 6, marginTop: 8,
+  },
+  viewerPdfBotaoGradient: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderRadius: 999, paddingHorizontal: 28, paddingVertical: 16,
+  },
+  viewerPdfBotaoTexto: { fontSize: 15, fontWeight: '800', color: '#fff', letterSpacing: 1 },
 })
