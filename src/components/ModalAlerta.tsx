@@ -1,6 +1,6 @@
 import { BlurView } from 'expo-blur'
 import { LinearGradient } from 'expo-linear-gradient'
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 
 type Props = {
   visivel: boolean
@@ -12,7 +12,8 @@ type Props = {
 export default function ModalAlerta({ visivel, titulo, mensagem, onFechar }: Props) {
   return (
     <Modal visible={visivel} transparent animationType="fade" onRequestClose={() => {}}>
-      <BlurView intensity={40} tint="dark" style={styles.fundo}>
+      <View style={styles.fundoEscuro}>
+        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} experimentalBlurMethod="dimezisBlurView" />
         <View style={styles.card}>
           <Text style={styles.titulo}>{titulo}</Text>
           <Text style={styles.mensagem}>{mensagem}</Text>
@@ -27,15 +28,15 @@ export default function ModalAlerta({ visivel, titulo, mensagem, onFechar }: Pro
             </LinearGradient>
           </TouchableOpacity>
         </View>
-      </BlurView>
+      </View>
     </Modal>
   )
 }
 
 const styles = StyleSheet.create({
-  fundo: {
+  fundoEscuro: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: Platform.OS === 'android' ? 'rgba(0,0,0,0.55)' : 'rgba(0,0,0,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
