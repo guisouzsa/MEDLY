@@ -1,151 +1,565 @@
 import { Feather } from '@expo/vector-icons'
+import { BlurView } from 'expo-blur'
 import { LinearGradient } from 'expo-linear-gradient'
 import { router, useFocusEffect } from 'expo-router'
+import * as WebBrowser from 'expo-web-browser'
 import { useCallback, useState } from 'react'
 import {
-    ActivityIndicator,
-    Image,
-    Platform,
-    ScrollView,
-    StyleSheet, Text,
-    TextInput, TouchableOpacity, View
+  ActivityIndicator,
+  Image,
+  Modal,
+  ScrollView,
+  StyleSheet, Text,
+  TextInput, TouchableOpacity, View
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '../../src/lib/supabase'
 
-type Filtro = 'todos' | 'medicamentos' | 'consultas' | 'sintomas' | 'exames'
+// ─── Tipos ────────────────────────────────────────────────────────────────────
+
+type TipoFiltro = 'medicamentos' | 'consultas' | 'sintomas' | 'exames'
 
 type Item = {
   id: number
-  tipo: Filtro
+  tipo: TipoFiltro
   titulo: string
   subtitulo: string
   icone: string
+  dados: any
 }
 
-const FILTROS: { label: string, valor: Filtro, icone: string }[] = [
-  { label: 'Todos',         valor: 'todos',        icone: 'grid' },
-  { label: 'Medicamentos',  valor: 'medicamentos', icone: 'activity' },
-  { label: 'Consultas',     valor: 'consultas',    icone: 'calendar' },
-  { label: 'Sintomas',      valor: 'sintomas',     icone: 'thermometer' },
-  { label: 'Exames',        valor: 'exames',       icone: 'file-text' },
+const FILTROS: { label: string, valor: TipoFiltro, icone: string }[] = [
+  { label: 'Medicamentos', valor: 'medicamentos', icone: 'activity' },
+  { label: 'Consultas', valor: 'consultas', icone: 'calendar' },
+  { label: 'Sintomas', valor: 'sintomas', icone: 'thermometer' },
+  { label: 'Exames', valor: 'exames', icone: 'file-text' },
 ]
 
 const COR_TIPO: Record<string, { bg: string, cor: string }> = {
   medicamentos: { bg: '#EDE8FA', cor: '#6B49AD' },
-  consultas:    { bg: '#DBEAFE', cor: '#1D4ED8' },
-  sintomas:     { bg: '#FEF9C3', cor: '#CA8A04' },
-  exames:       { bg: '#DCFCE7', cor: '#16A34A' },
+  consultas: { bg: '#DBEAFE', cor: '#1D4ED8' },
+  sintomas: { bg: '#FEF9C3', cor: '#CA8A04' },
+  exames: { bg: '#DCFCE7', cor: '#16A34A' },
 }
+
+const DIAS_SEMANA_LABEL = [
+  { label: 'Seg', valor: 1 }, { label: 'Ter', valor: 2 },
+  { label: 'Qua', valor: 3 }, { label: 'Qui', valor: 4 },
+  { label: 'Sex', valor: 5 }, { label: 'Sáb', valor: 6 },
+  { label: 'Dom', valor: 0 },
+]
+
+const PAIN_SCALE = [
+  { valor: 0, emoji: '😌', label: 'Sem dor', roxo: '#F3EEFF' },
+  { valor: 1, emoji: '🙂', label: 'Muito leve', roxo: '#E9E0FF' },
+  { valor: 2, emoji: '😐', label: 'Leve', roxo: '#D9CCFF' },
+  { valor: 3, emoji: '😑', label: 'Tolerável', roxo: '#C4B0FF' },
+  { valor: 4, emoji: '😟', label: 'Moderada', roxo: '#A98EE8' },
+  { valor: 5, emoji: '😧', label: 'Intensa', roxo: '#8B6FCC' },
+  { valor: 6, emoji: '😮', label: 'Muito intensa', roxo: '#7055B0' },
+  { valor: 7, emoji: '😣', label: 'Severa', roxo: '#5A3E96' },
+  { valor: 8, emoji: '😖', label: 'Muito severa', roxo: '#44297C' },
+  { valor: 9, emoji: '😭', label: 'Insuportável', roxo: '#2E1760' },
+  { valor: 10, emoji: '🤯', label: 'Inimaginável', roxo: '#1A0A3D' },
+]
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatarData(data: string): string {
+  if (!data) return ''
+  const parts = data.split('-')
+  if (parts.length < 3) return data
+  return `${parts[2]}/${parts[1]}/${parts[0]}`
+}
+
+function formatarHorario(horario: string): string {
+  if (!horario) return ''
+  return horario.slice(0, 5)
+}
+
+function labelFrequencia(med: any): string {
+  if (med.frequencia_tipo === 'diario') return 'Diário'
+  if (med.frequencia_tipo === 'semanal') return 'Semanal'
+  if (med.frequencia_tipo === 'mensal') return 'Mensal'
+  if (med.frequencia_tipo === 'personalizado' && med.intervalo_horas) return `A cada ${med.intervalo_horas}h`
+  return med.frequencia_tipo || ''
+}
+
+function statusCor(status: string): { bg: string; cor: string } {
+  if (status === 'ativo') return { bg: '#DCFCE7', cor: '#16A34A' }
+  if (status === 'pausado') return { bg: '#FFF3E0', cor: '#EF6C00' }
+  return { bg: '#EDE8FA', cor: '#481D94' }
+}
+
+function jaPassouConsulta(consulta: any): boolean {
+  if (!consulta.data) return false
+  const agora = new Date()
+  const [ano, mes, dia] = consulta.data.split('-').map(Number)
+  const horarioStr = consulta.horario ? consulta.horario.slice(0, 5) : '23:59'
+  const [hora, minuto] = horarioStr.split(':').map(Number)
+  const dataConsulta = new Date(ano, mes - 1, dia, hora, minuto)
+  return dataConsulta < agora
+}
+
+function jaPassouExame(exame: any): boolean {
+  if (!exame.data_realizacao) return false
+  const agora = new Date()
+  const [ano, mes, dia] = exame.data_realizacao.split('-').map(Number)
+  const horarioStr = exame.horario ? exame.horario.slice(0, 5) : '23:59'
+  const [hora, minuto] = horarioStr.split(':').map(Number)
+  return new Date(ano, mes - 1, dia, hora, minuto) < agora
+}
+
+function isImageUrl(url: string) {
+  if (!url) return false
+  const u = url.toLowerCase()
+  return u.includes('.png') || u.includes('.jpg') || u.includes('.jpeg') || u.includes('.gif') || u.includes('.webp')
+}
+
+// ─── Cards copiados das telas originais ──────────────────────────────────────
+
+function CardMedicamento({ dados }: { dados: any }) {
+  const [expandido, setExpandido] = useState(false)
+  const sc = statusCor(dados.status)
+  const hs = dados.medicamento_horarios ?? []
+
+  function horariosTexto(): string | null {
+    if (dados.frequencia_tipo === 'diario') {
+      const h = hs.map((x: any) => x.horario.slice(0, 5)).join(' · ')
+      return h || null
+    }
+    if (dados.frequencia_tipo === 'semanal' || dados.frequencia_tipo === 'mensal') {
+      const unicos = [...new Set(hs.map((x: any) => x.horario.slice(0, 5)))] as string[]
+      return unicos.length > 0 ? unicos.join(' · ') : null
+    }
+    if (dados.frequencia_tipo === 'personalizado' && dados.intervalo_horas) {
+      const H = dados.intervalo_horas
+      const startStr = dados.horario ? dados.horario.slice(0, 5) : '00:00'
+      const [sh, sm] = startStr.split(':').map(Number)
+      const hrs: string[] = []
+      for (let hOffset = 0; hOffset < 24; hOffset += H) {
+        const h = (sh + hOffset) % 24
+        hrs.push(`${String(h).padStart(2, '0')}:${String(sm).padStart(2, '0')}`)
+      }
+      return hrs.sort().join(' · ')
+    }
+    return null
+  }
+
+  function diasTexto(): string | null {
+    if (dados.frequencia_tipo === 'semanal') {
+      const dias = [...new Set(hs.map((x: any) => DIAS_SEMANA_LABEL.find(d => d.valor === x.dia_semana)?.label ?? ''))].filter(Boolean) as string[]
+      return dias.length > 0 ? dias.join(', ') : null
+    }
+    if (dados.frequencia_tipo === 'mensal') {
+      const dias = [...new Set(hs.map((x: any) => x.dia_mes))].filter(Boolean).sort((a: any, b: any) => a - b)
+      return dias.length > 0 ? `Dias ${dias.join(', ')}` : null
+    }
+    return null
+  }
+
+  const ht = horariosTexto()
+  const dt = diasTexto()
+
+  const temDetalhes = !!(dados.quantidade_por_dose || ht || dt || dados.data_termino || dados.data_retorno || dados.motivo_encerramento || dados.observacoes)
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardTopo}>
+        <LinearGradient
+          colors={dados.status === 'ativo' ? ['#6B49AD', '#481D94'] : ['#9163CB', '#7C4FBD']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={styles.cardIconeBox}
+        >
+          <Feather name="activity" size={22} color="#fff" />
+        </LinearGradient>
+        <View style={styles.cardTextos}>
+          <Text style={styles.cardNome}>{dados.nome}</Text>
+          {dados.dosagem ? <Text style={styles.cardSubtitulo}>{dados.dosagem}</Text> : null}
+        </View>
+      </View>
+      <View style={styles.cardDivisor} />
+      <View style={styles.cardInfos}>
+        <View style={[styles.badgeStatus, { backgroundColor: sc.bg }]}>
+          <Feather name={dados.status === 'ativo' ? 'check-circle' : dados.status === 'pausado' ? 'pause-circle' : 'x-circle'} size={11} color={sc.cor} />
+          <Text style={[styles.badgeStatusTexto, { color: sc.cor }]}>{dados.status?.charAt(0).toUpperCase() + dados.status?.slice(1)}</Text>
+        </View>
+        <View style={styles.infoLinha}>
+          <Feather name="refresh-cw" size={15} color="#6B49AD" />
+          <Text style={styles.infoLinhaLabel}>Frequência</Text>
+          <Text style={styles.infoLinhaTexto}>{labelFrequencia(dados)}</Text>
+        </View>
+        {dados.data_inicio ? (
+          <View style={styles.infoLinha}>
+            <Feather name="calendar" size={15} color="#6B49AD" />
+            <Text style={styles.infoLinhaLabel}>Início</Text>
+            <Text style={styles.infoLinhaTexto}>{formatarData(dados.data_inicio)}</Text>
+          </View>
+        ) : null}
+      </View>
+      {expandido && temDetalhes && (
+        <View style={styles.cardDetalhes}>
+          <View style={styles.cardDivisor} />
+          {dados.quantidade_por_dose ? (
+            <View style={styles.infoLinha}>
+              <Feather name="package" size={15} color="#6B49AD" />
+              <Text style={styles.infoLinhaLabel}>Por dose</Text>
+              <Text style={styles.infoLinhaTexto}>{dados.quantidade_por_dose}</Text>
+            </View>
+          ) : null}
+          {dt ? (
+            <View style={styles.infoLinha}>
+              <Feather name="calendar" size={15} color="#6B49AD" />
+              <Text style={styles.infoLinhaLabel}>Dias</Text>
+              <Text style={styles.infoLinhaTexto}>{dt}</Text>
+            </View>
+          ) : null}
+          {ht ? (
+            <View style={styles.infoLinha}>
+              <Feather name="clock" size={15} color="#6B49AD" />
+              <Text style={styles.infoLinhaLabel}>Horários</Text>
+              <Text style={styles.infoLinhaTexto}>{ht}</Text>
+            </View>
+          ) : null}
+          {dados.data_termino ? (
+            <View style={styles.infoLinha}>
+              <Feather name="calendar" size={15} color="#6B49AD" />
+              <Text style={styles.infoLinhaLabel}>Término</Text>
+              <Text style={styles.infoLinhaTexto}>{formatarData(dados.data_termino)}</Text>
+            </View>
+          ) : null}
+          {dados.status === 'pausado' && dados.data_retorno ? (
+            <View style={styles.infoLinha}>
+              <Feather name="clock" size={15} color="#6B49AD" />
+              <Text style={styles.infoLinhaLabel}>Retorno</Text>
+              <Text style={styles.infoLinhaTexto}>{formatarData(dados.data_retorno)}</Text>
+            </View>
+          ) : null}
+          {dados.status === 'encerrado' && dados.motivo_encerramento ? (
+            <View style={[styles.infoLinha, { alignItems: 'flex-start' }]}>
+              <Feather name="x-circle" size={15} color="#6B49AD" style={{ marginTop: 2 }} />
+              <Text style={styles.infoLinhaLabel}>Motivo</Text>
+              <Text style={[styles.infoLinhaTexto, { flex: 1 }]}>{dados.motivo_encerramento}</Text>
+            </View>
+          ) : null}
+          {dados.observacoes ? (
+            <View style={[styles.infoLinha, { alignItems: 'flex-start' }]}>
+              <Feather name="file-text" size={15} color="#6B49AD" style={{ marginTop: 2 }} />
+              <Text style={styles.infoLinhaLabel}>Obs.</Text>
+              <Text style={[styles.infoLinhaTexto, { flex: 1 }]}>{dados.observacoes}</Text>
+            </View>
+          ) : null}
+        </View>
+      )}
+      {temDetalhes && (
+        <TouchableOpacity onPress={() => setExpandido(e => !e)} activeOpacity={0.7} style={styles.verMaisBtn}>
+          <Text style={styles.verMaisTexto}>{expandido ? 'Ver menos' : 'Ver mais'}</Text>
+          <Feather name={expandido ? 'chevron-up' : 'chevron-down'} size={14} color="#6B49AD" />
+        </TouchableOpacity>
+      )}
+    </View>
+  )
+}
+
+function CardConsulta({ dados }: { dados: any }) {
+  const [expandido, setExpandido] = useState(false)
+  const isFutura = !jaPassouConsulta(dados)
+  const temDetalhes = !!(dados.local || dados.motivo || dados.observacoes)
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardTopo}>
+        <LinearGradient
+          colors={isFutura ? ['#6B49AD', '#481D94'] : ['#9163CB', '#7C4FBD']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={styles.cardIconeBox}
+        >
+          <Feather name="calendar" size={22} color="#fff" />
+        </LinearGradient>
+        <View style={styles.cardTextos}>
+          <Text style={styles.cardNome}>{dados.especialidade}</Text>
+          <Text style={styles.cardSubtitulo}>{dados.nome_medico}</Text>
+        </View>
+      </View>
+      <View style={styles.cardDivisor} />
+      <View style={styles.cardInfos}>
+        <View style={isFutura ? styles.badgeProxima : styles.badgeRealizada}>
+          <Feather name={isFutura ? 'clock' : 'check-circle'} size={11} color={isFutura ? '#185FA5' : '#6B49AD'} />
+          <Text style={isFutura ? styles.badgeProximaTexto : styles.badgeRealizadaTexto}>{isFutura ? 'Próxima' : 'Realizada'}</Text>
+        </View>
+        {dados.data ? (
+          <View style={styles.infoLinha}>
+            <Feather name="calendar" size={15} color="#6B49AD" />
+            <Text style={styles.infoLinhaLabel}>Data e Hora</Text>
+            <Text style={styles.infoLinhaTexto}>{formatarData(dados.data)}{dados.horario ? ` às ${formatarHorario(dados.horario)}` : ''}</Text>
+          </View>
+        ) : null}
+      </View>
+      {expandido && temDetalhes && (
+        <View style={styles.cardDetalhes}>
+          <View style={styles.cardDivisor} />
+          {dados.local ? (
+            <View style={styles.infoLinha}>
+              <Feather name="map-pin" size={15} color="#6B49AD" />
+              <Text style={styles.infoLinhaLabel}>Local</Text>
+              <Text style={styles.infoLinhaTexto}>{dados.local}</Text>
+            </View>
+          ) : null}
+          {dados.motivo ? (
+            <View style={[styles.infoLinha, { alignItems: 'flex-start' }]}>
+              <Feather name="file-text" size={15} color="#6B49AD" style={{ marginTop: 2 }} />
+              <Text style={styles.infoLinhaLabel}>Motivo</Text>
+              <Text style={[styles.infoLinhaTexto, { flex: 1 }]}>{dados.motivo}</Text>
+            </View>
+          ) : null}
+          {dados.observacoes ? (
+            <View style={[styles.infoLinha, { alignItems: 'flex-start' }]}>
+              <Feather name="message-square" size={15} color="#6B49AD" style={{ marginTop: 2 }} />
+              <Text style={styles.infoLinhaLabel}>Obs.</Text>
+              <Text style={[styles.infoLinhaTexto, { flex: 1 }]}>{dados.observacoes}</Text>
+            </View>
+          ) : null}
+        </View>
+      )}
+      {temDetalhes && (
+        <TouchableOpacity onPress={() => setExpandido(e => !e)} activeOpacity={0.7} style={styles.verMaisBtn}>
+          <Text style={styles.verMaisTexto}>{expandido ? 'Ver menos' : 'Ver mais'}</Text>
+          <Feather name={expandido ? 'chevron-up' : 'chevron-down'} size={14} color="#6B49AD" />
+        </TouchableOpacity>
+      )}
+    </View>
+  )
+}
+
+function CardExame({ dados }: { dados: any }) {
+  const [expandido, setExpandido] = useState(false)
+  const isFuturo = !jaPassouExame(dados)
+  const temDetalhes = !!(dados.data_resultado || dados.arquivo_url)
+
+  async function abrirArquivo(url: string) {
+    try {
+      await WebBrowser.openBrowserAsync(url)
+    } catch (err) {
+      console.log('Erro ao abrir arquivo:', err)
+    }
+  }
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardTopo}>
+        <LinearGradient
+          colors={isFuturo ? ['#6B49AD', '#481D94'] : ['#9163CB', '#7C4FBD']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={styles.cardIconeBox}
+        >
+          <Feather name="file-text" size={22} color="#fff" />
+        </LinearGradient>
+        <View style={styles.cardTextos}>
+          <Text style={styles.cardNome}>{dados.nome}</Text>
+          {dados.local ? <Text style={styles.cardSubtitulo}>{dados.local}</Text> : null}
+        </View>
+      </View>
+      <View style={styles.cardDivisor} />
+      <View style={styles.cardInfos}>
+        <View style={isFuturo ? styles.badgeProxima : styles.badgeRealizada}>
+          <Feather name={isFuturo ? 'clock' : 'check-circle'} size={11} color={isFuturo ? '#185FA5' : '#6B49AD'} />
+          <Text style={isFuturo ? styles.badgeProximaTexto : styles.badgeRealizadaTexto}>{isFuturo ? 'Próximo' : 'Realizado'}</Text>
+        </View>
+        {dados.data_realizacao ? (
+          <View style={styles.infoLinha}>
+            <Feather name="calendar" size={15} color="#6B49AD" />
+            <Text style={styles.infoLinhaLabel}>Data e Hora</Text>
+            <Text style={styles.infoLinhaTexto}>{formatarData(dados.data_realizacao)}{dados.horario ? ` às ${formatarHorario(dados.horario)}` : ''}</Text>
+          </View>
+        ) : null}
+      </View>
+      {expandido && temDetalhes && (
+        <View style={styles.cardDetalhes}>
+          <View style={styles.cardDivisor} />
+          {dados.data_resultado ? (
+            <View style={styles.infoLinha}>
+              <Feather name="check-circle" size={15} color="#6B49AD" />
+              <Text style={styles.infoLinhaLabel}>Result.</Text>
+              <Text style={styles.infoLinhaTexto}>{formatarData(dados.data_resultado)}</Text>
+            </View>
+          ) : null}
+          {dados.arquivo_url ? (
+            <TouchableOpacity onPress={() => abrirArquivo(dados.arquivo_url)} activeOpacity={0.75} style={styles.btnArquivoCard}>
+              <View style={styles.btnArquivoCardIcone}>
+                {isImageUrl(dados.arquivo_url) ? (
+                  <Feather name="image" size={16} color="#6B49AD" />
+                ) : (
+                  <Feather name="file-text" size={16} color="#dc2626" />
+                )}
+              </View>
+              <Text style={styles.btnArquivoCardTexto}>{isImageUrl(dados.arquivo_url) ? 'Ver imagem' : 'Ver PDF'}</Text>
+              <Feather name="external-link" size={14} color="#6B49AD" style={{ marginLeft: 'auto' }} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      )}
+      {temDetalhes && (
+        <TouchableOpacity onPress={() => setExpandido(e => !e)} activeOpacity={0.7} style={styles.verMaisBtn}>
+          <Text style={styles.verMaisTexto}>{expandido ? 'Ver menos' : 'Ver mais'}</Text>
+          <Feather name={expandido ? 'chevron-up' : 'chevron-down'} size={14} color="#6B49AD" />
+        </TouchableOpacity>
+      )}
+    </View>
+  )
+}
+
+function CardSintoma({ dados }: { dados: any }) {
+  const [expandido, setExpandido] = useState(false)
+  const pain = PAIN_SCALE[dados.intensidade] ?? PAIN_SCALE[0]
+  const temDetalhes = !!(dados.horario || dados.duracao || dados.observacoes)
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardTopo}>
+        <View style={[styles.cardIconeBox, { backgroundColor: pain.roxo }]}>
+          <Text style={styles.cardEmoji}>{pain.emoji}</Text>
+        </View>
+        <View style={styles.cardTextos}>
+          <Text style={styles.cardNome}>{dados.nome}</Text>
+        </View>
+      </View>
+      <View style={styles.cardDivisor} />
+      <View style={styles.cardInfos}>
+        <View style={[styles.badgeIntensidade, { backgroundColor: pain.roxo }]}>
+          <Feather name="activity" size={11} color={dados.intensidade <= 3 ? '#481D94' : '#fff'} />
+          <Text style={[styles.badgeIntensidadeTexto, { color: dados.intensidade <= 3 ? '#481D94' : '#fff' }]}>
+            {dados.intensidade}/10 — {pain.label}
+          </Text>
+        </View>
+        <View style={styles.infoLinha}>
+          <Feather name="calendar" size={15} color="#6B49AD" />
+          <Text style={styles.infoLinhaLabel}>Data</Text>
+          <Text style={styles.infoLinhaTexto}>{formatarData(dados.data)}</Text>
+        </View>
+        {dados.gatilho ? (
+          <View style={styles.infoLinha}>
+            <Feather name="zap" size={15} color="#6B49AD" />
+            <Text style={styles.infoLinhaLabel}>Gatilho</Text>
+            <Text style={styles.infoLinhaTexto}>{dados.gatilho}</Text>
+          </View>
+        ) : null}
+      </View>
+      {expandido && temDetalhes && (
+        <View style={styles.cardDetalhes}>
+          <View style={styles.cardDivisor} />
+          {dados.horario ? (
+            <View style={styles.infoLinha}>
+              <Feather name="clock" size={15} color="#6B49AD" />
+              <Text style={styles.infoLinhaLabel}>Horário</Text>
+              <Text style={styles.infoLinhaTexto}>{dados.horario.slice(0, 5)}</Text>
+            </View>
+          ) : null}
+          {dados.duracao ? (
+            <View style={styles.infoLinha}>
+              <Feather name="watch" size={15} color="#6B49AD" />
+              <Text style={styles.infoLinhaLabel}>Duração</Text>
+              <Text style={styles.infoLinhaTexto}>{dados.duracao}</Text>
+            </View>
+          ) : null}
+          {dados.observacoes ? (
+            <View style={[styles.infoLinha, { alignItems: 'flex-start' }]}>
+              <Feather name="file-text" size={15} color="#6B49AD" style={{ marginTop: 2 }} />
+              <Text style={styles.infoLinhaLabel}>Obs.</Text>
+              <Text style={[styles.infoLinhaTexto, { flex: 1 }]}>{dados.observacoes}</Text>
+            </View>
+          ) : null}
+        </View>
+      )}
+      {temDetalhes && (
+        <TouchableOpacity onPress={() => setExpandido(e => !e)} activeOpacity={0.7} style={styles.verMaisBtn}>
+          <Text style={styles.verMaisTexto}>{expandido ? 'Ver menos' : 'Ver mais'}</Text>
+          <Feather name={expandido ? 'chevron-up' : 'chevron-down'} size={14} color="#6B49AD" />
+        </TouchableOpacity>
+      )}
+    </View>
+  )
+}
+
+// ─── Tela principal ───────────────────────────────────────────────────────────
 
 export default function Pesquisar() {
   const [busca, setBusca] = useState('')
-  const [filtro, setFiltro] = useState<Filtro>('todos')
+  const [filtros, setFiltros] = useState<TipoFiltro[]>([])
   const [itens, setItens] = useState<Item[]>([])
   const [carregando, setCarregando] = useState(false)
   const [perfilFoto, setPerfilFoto] = useState<string | null>(null)
+  const [modalFiltroVisivel, setModalFiltroVisivel] = useState(false)
 
   useFocusEffect(
     useCallback(() => {
       async function carregarDados() {
         setCarregando(true)
         const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
-          router.replace('/auth')
-          return
-        }
+        if (!user) { router.replace('/auth'); return }
 
         try {
-          // 1. Carrega Perfil
           const { data: perfil } = await supabase
-            .from('perfis')
-            .select('foto_url')
-            .eq('id', user.id)
-            .single()
-          if (perfil) {
-            if (perfil.foto_url) {
-              const url = perfil.foto_url.includes('?') ? perfil.foto_url : `${perfil.foto_url}?t=${Date.now()}`
-              setPerfilFoto(url)
-            } else {
-              setPerfilFoto(null)
-            }
+            .from('perfis').select('foto_url').eq('id', user.id).single()
+          if (perfil?.foto_url) {
+            const url = perfil.foto_url.includes('?') ? perfil.foto_url : `${perfil.foto_url}?t=${Date.now()}`
+            setPerfilFoto(url)
+          } else {
+            setPerfilFoto(null)
           }
 
-          // 2. Carrega Dados
           const resultado: Item[] = []
+          const deveBuscar = (tipo: TipoFiltro) => filtros.length === 0 || filtros.includes(tipo)
 
-          if (filtro === 'todos' || filtro === 'medicamentos') {
-            const { data } = await supabase.from('medicamentos').select('id, nome, dosagem, horario, status').eq('usuario_id', user.id)
+          if (deveBuscar('medicamentos')) {
+            const { data } = await supabase
+              .from('medicamentos')
+              .select('*, medicamento_horarios(id, horario, dia_semana, dia_mes)')
+              .eq('usuario_id', user.id)
             data?.forEach(m => resultado.push({
               id: m.id, tipo: 'medicamentos',
               titulo: m.nome,
-              subtitulo: [m.dosagem, m.horario, m.status].filter(Boolean).join(' · '),
-              icone: 'activity',
+              subtitulo: [m.dosagem, m.status].filter(Boolean).join(' · '),
+              icone: 'activity', dados: m,
             }))
           }
 
-          if (filtro === 'todos' || filtro === 'consultas') {
-            const { data } = await supabase.from('consultas').select('id, especialidade, nome_medico, data, horario, local').eq('usuario_id', user.id)
-            data?.forEach(c => {
-              const dataFormatada = (() => {
-                if (!c.data) return ''
-                const parts = c.data.split('-')
-                if (parts.length < 3) return c.data
-                return `${parts[2]}/${parts[1]}/${parts[0]}`
-              })()
-              const dataHora = [dataFormatada, c.horario].filter(Boolean).join(' às ')
-              resultado.push({
-                id: c.id, tipo: 'consultas',
-                titulo: c.especialidade,
-                subtitulo: [c.nome_medico, dataHora, c.local].filter(Boolean).join(' · '),
-                icone: 'calendar',
-              })
-            })
+          if (deveBuscar('consultas')) {
+            const { data } = await supabase
+              .from('consultas')
+              .select('id, especialidade, nome_medico, data, horario, local, motivo, observacoes')
+              .eq('usuario_id', user.id)
+            data?.forEach(c => resultado.push({
+              id: c.id, tipo: 'consultas',
+              titulo: c.especialidade,
+              subtitulo: [c.nome_medico, formatarData(c.data)].filter(Boolean).join(' · '),
+              icone: 'calendar', dados: c,
+            }))
           }
 
-          if (filtro === 'todos' || filtro === 'sintomas') {
-            const { data } = await supabase.from('sintomas').select('id, nome, intensidade, data').eq('usuario_id', user.id)
-            data?.forEach(s => {
-              const dataFormatada = (() => {
-                if (!s.data) return ''
-                const parts = s.data.split('-')
-                if (parts.length < 3) return s.data
-                return `${parts[2]}/${parts[1]}/${parts[0]}`
-              })()
-              resultado.push({
-                id: s.id, tipo: 'sintomas',
-                titulo: s.nome,
-                subtitulo: [`Intensidade ${s.intensidade}/10`, dataFormatada].filter(Boolean).join(' · '),
-                icone: 'thermometer',
-              })
-            })
+          if (deveBuscar('sintomas')) {
+            const { data } = await supabase
+              .from('sintomas')
+              .select('id, nome, intensidade, data, horario, duracao, gatilho, observacoes')
+              .eq('usuario_id', user.id)
+            data?.forEach(s => resultado.push({
+              id: s.id, tipo: 'sintomas',
+              titulo: s.nome,
+              subtitulo: `Intensidade ${s.intensidade}/10`,
+              icone: 'thermometer', dados: s,
+            }))
           }
 
-          if (filtro === 'todos' || filtro === 'exames') {
-            const { data } = await supabase.from('exames').select('id, nome, data_realizacao, horario').eq('usuario_id', user.id)
-            data?.forEach(e => {
-              const dataFormatada = (() => {
-                if (!e.data_realizacao) return ''
-                const parts = e.data_realizacao.split('-')
-                if (parts.length < 3) return e.data_realizacao
-                return `${parts[2]}/${parts[1]}/${parts[0]}`
-              })()
-              const status = (() => {
-                if (!e.data_realizacao) return ''
-                const agora = new Date()
-                const [ano, mes, dia] = e.data_realizacao.split('-').map(Number)
-                const horarioStr = e.horario ? e.horario.slice(0, 5) : '23:59'
-                const [hora, minuto] = horarioStr.split(':').map(Number)
-                const dataExame = new Date(ano, mes - 1, dia, hora, minuto)
-                return dataExame < agora ? 'Realizado' : 'Próximo'
-              })()
-              resultado.push({
-                id: e.id, tipo: 'exames',
-                titulo: e.nome,
-                subtitulo: [dataFormatada, status].filter(Boolean).join(' · '),
-                icone: 'file-text',
-              })
-            })
+          if (deveBuscar('exames')) {
+            const { data } = await supabase
+              .from('exames')
+              .select('id, nome, data_realizacao, horario, local, data_resultado, arquivo_url')
+              .eq('usuario_id', user.id)
+            data?.forEach(e => resultado.push({
+              id: e.id, tipo: 'exames',
+              titulo: e.nome,
+              subtitulo: formatarData(e.data_realizacao),
+              icone: 'file-text', dados: e,
+            }))
           }
 
           setItens(resultado)
@@ -156,18 +570,33 @@ export default function Pesquisar() {
         }
       }
       carregarDados()
-    }, [filtro])
+    }, [filtros])
   )
+
+  function toggleFiltro(valor: TipoFiltro) {
+    setFiltros(prev =>
+      prev.includes(valor) ? prev.filter(f => f !== valor) : [...prev, valor]
+    )
+  }
 
   const itensFiltrados = itens.filter(item =>
     item.titulo.toLowerCase().includes(busca.toLowerCase()) ||
     item.subtitulo.toLowerCase().includes(busca.toLowerCase())
   )
 
+  function renderCard(item: Item) {
+    if (item.tipo === 'medicamentos') return <CardMedicamento key={`med-${item.id}`} dados={item.dados} />
+    if (item.tipo === 'consultas') return <CardConsulta key={`con-${item.id}`} dados={item.dados} />
+    if (item.tipo === 'exames') return <CardExame key={`exa-${item.id}`} dados={item.dados} />
+    if (item.tipo === 'sintomas') return <CardSintoma key={`sin-${item.id}`} dados={item.dados} />
+    return null
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Card 1 — Perfil + Logo */}
+
+        {/* Card Perfil */}
         <View style={styles.cardPerfil}>
           <TouchableOpacity onPress={() => router.push('/modulos/perfil' as any)} activeOpacity={0.85}>
             {perfilFoto ? (
@@ -182,55 +611,46 @@ export default function Pesquisar() {
           <View style={{ width: 44 }} />
         </View>
 
-        {/* Card 2 — Título */}
+        {/* Header */}
         <View style={styles.headerTitleBox}>
           <Text style={styles.headerTitleText}>Pesquisar no Medly</Text>
           <Text style={styles.headerSubText}>Encontre seus registros rapidamente</Text>
         </View>
 
-        {/* Caixa de pesquisa */}
-        <View style={styles.inputContainer}>
-          <View style={styles.inputBox}>
-            <Feather name="search" size={20} color="#6B49AD" />
-            <TextInput
-              style={styles.input}
-              value={busca}
-              onChangeText={setBusca}
-              placeholder="Digite o que procura..."
-              placeholderTextColor="#A78BFA"
-              autoCorrect={false}
-            />
-            {busca.length > 0 && (
-              <TouchableOpacity onPress={() => setBusca('')} style={styles.clearBtn}>
-                <Feather name="x" size={16} color="#fff" />
-              </TouchableOpacity>
-            )}
-          </View>
+        {/* Input de pesquisa */}
+        <View style={styles.inputBox}>
+          <Feather name="search" size={18} color="#6B49AD" />
+          <TextInput
+            style={styles.input}
+            value={busca}
+            onChangeText={setBusca}
+            placeholder="Digite o que procura..."
+            placeholderTextColor="#9163CB"
+            autoCorrect={false}
+          />
+          {busca.length > 0 && (
+            <TouchableOpacity onPress={() => setBusca('')} style={styles.clearBtn}>
+              <Feather name="x" size={14} color="#fff" />
+            </TouchableOpacity>
+          )}
         </View>
 
-        {/* Filtros em linha horizontal scrollable */}
-        <View style={styles.filtrosContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtrosScroll}>
-            {FILTROS.map((f) => {
-              const ativo = filtro === f.valor
-              return (
-                <TouchableOpacity
-                  key={f.valor}
-                  onPress={() => setFiltro(f.valor)}
-                  activeOpacity={0.8}
-                  style={[styles.filtroPil, ativo && styles.filtroPilAtivo]}
-                >
-                  <Feather name={f.icone as any} size={13} color={ativo ? '#fff' : '#6B49AD'} />
-                  <Text style={[styles.filtroPilTexto, ativo && styles.filtroPilTextoAtivo]}>
-                    {f.label}
-                  </Text>
-                </TouchableOpacity>
-              )
-            })}
-          </ScrollView>
-        </View>
+        {/* Botão de filtro compacto */}
+        <TouchableOpacity
+          onPress={() => setModalFiltroVisivel(true)}
+          activeOpacity={0.8}
+          style={styles.botaoEscolherFiltro}
+        >
+          <Feather name="filter" size={14} color="#fff" />
+          <Text style={styles.botaoFiltroTexto}>Filtrar categoria</Text>
+          {filtros.length > 0 && (
+            <View style={styles.filtrosBadge}>
+              <Text style={styles.filtrosBadgeTexto}>{filtros.length}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
 
-        {/* Lista de Resultados */}
+        {/* Lista */}
         {carregando ? (
           <ActivityIndicator size="large" color="#6B49AD" style={{ marginTop: 40 }} />
         ) : itensFiltrados.length === 0 ? (
@@ -243,54 +663,109 @@ export default function Pesquisar() {
           </View>
         ) : (
           <View style={styles.lista}>
-            {itensFiltrados.map((item, i) => {
-              const cor = COR_TIPO[item.tipo]
-              return (
-                <View key={`${item.tipo}-${item.id}-${i}`} style={styles.card}>
-                  <View style={[styles.cardIconeBox, { backgroundColor: cor.bg }]}>
-                    <Feather name={item.icone as any} size={24} color={cor.cor} />
-                  </View>
-                  <View style={styles.cardTextos}>
-                    <View style={styles.cardTopo}>
-                      <Text style={styles.cardTitulo} numberOfLines={1}>{item.titulo}</Text>
-                      <View style={[styles.tagTipo, { backgroundColor: cor.bg }]}>
-                        <Text style={[styles.tagTipoTexto, { color: cor.cor }]}>
-                          {item.tipo.charAt(0).toUpperCase() + item.tipo.slice(1, -1)}
-                        </Text>
-                      </View>
-                    </View>
-                    {item.subtitulo ? (
-                      <Text style={styles.cardSub}>{item.subtitulo}</Text>
-                    ) : null}
-                  </View>
-                  <Feather name="chevron-right" size={20} color="#D1D5DB" />
-                </View>
-              )
-            })}
+            {itensFiltrados.map(item => renderCard(item))}
           </View>
         )}
-        <View style={{ height: 100 }} />
+
+        <View style={{ height: 120 }} />
       </ScrollView>
+
+      {/* Modal de filtros com multi-select */}
+      <Modal visible={modalFiltroVisivel} transparent animationType="fade" onRequestClose={() => setModalFiltroVisivel(false)}>
+        <View style={styles.modalFundo}>
+          <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} experimentalBlurMethod="dimezisBlurView" />
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setModalFiltroVisivel(false)} />
+          <View style={styles.modalCardFiltro}>
+            <View style={styles.modalFiltroHeader}>
+              <Text style={styles.modalFiltroTitulo}>Filtrar por tipo</Text>
+              <TouchableOpacity onPress={() => setModalFiltroVisivel(false)} style={styles.modalFiltroFechar}>
+                <Feather name="x" size={20} color="#6B49AD" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.modalFiltroSub}>Selecione um ou mais tipos de registro</Text>
+            <View style={styles.modalFiltroLinha} />
+
+            {/* Opção "Todos" */}
+            <TouchableOpacity
+              onPress={() => setFiltros([])}
+              activeOpacity={0.7}
+              style={[styles.opcaoFiltro, filtros.length === 0 && styles.opcaoFiltroAtiva]}
+            >
+              <View style={[styles.opcaoFiltroIconeBox, { backgroundColor: filtros.length === 0 ? '#6B49AD' : '#F5F0FF' }]}>
+                <Feather name="grid" size={16} color={filtros.length === 0 ? '#fff' : '#6B49AD'} />
+              </View>
+              <Text style={[styles.opcaoFiltroLabel, filtros.length === 0 && styles.opcaoFiltroLabelAtiva]}>
+                Todos os registros
+              </Text>
+              {filtros.length === 0 && <Feather name="check" size={18} color="#6B49AD" style={{ marginLeft: 'auto' }} />}
+            </TouchableOpacity>
+
+            {FILTROS.map((f) => {
+              const ativo = filtros.includes(f.valor)
+              return (
+                <TouchableOpacity
+                  key={f.valor}
+                  onPress={() => toggleFiltro(f.valor)}
+                  activeOpacity={0.7}
+                  style={[styles.opcaoFiltro, ativo && styles.opcaoFiltroAtiva]}
+                >
+                  <View style={[styles.opcaoFiltroIconeBox, { backgroundColor: ativo ? '#6B49AD' : '#F5F0FF' }]}>
+                    <Feather name={f.icone as any} size={16} color={ativo ? '#fff' : '#6B49AD'} />
+                  </View>
+                  <Text style={[styles.opcaoFiltroLabel, ativo && styles.opcaoFiltroLabelAtiva]}>
+                    {f.label}
+                  </Text>
+                  <View style={[styles.checkbox, ativo && styles.checkboxAtivo]}>
+                    {ativo && <Feather name="check" size={12} color="#fff" />}
+                  </View>
+                </TouchableOpacity>
+              )
+            })}
+
+            {filtros.length > 0 && (
+              <TouchableOpacity
+                onPress={() => { setFiltros([]); setModalFiltroVisivel(false) }}
+                style={styles.btnLimparFiltros}
+              >
+                <Text style={styles.btnLimparFiltrosTexto}>Limpar filtros</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              onPress={() => setModalFiltroVisivel(false)}
+              activeOpacity={0.85}
+              style={styles.btnAplicarFiltros}
+            >
+              <LinearGradient
+                colors={['#6B49AD', '#481D94']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={styles.btnAplicarGradient}
+              >
+                <Text style={styles.btnAplicarTexto}>
+                  {filtros.length === 0 ? 'VER TODOS' : `APLICAR ${filtros.length} FILTRO${filtros.length > 1 ? 'S' : ''}`}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   )
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: '#F5F0FF',
-  },
-  scroll: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-  },
+  safe: { flex: 1, backgroundColor: '#F5F0FF' },
+  scroll: { paddingHorizontal: 16, paddingTop: 12 },
+
+  // Header
   cardPerfil: {
     backgroundColor: '#fff', marginHorizontal: 0, marginTop: 0,
     borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10,
     flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between',
     shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1, shadowRadius: 12, elevation: 5,
-    marginBottom: 14,
+    shadowOpacity: 0.1, shadowRadius: 12, elevation: 5, marginBottom: 14,
   },
   fotoPerfil: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#E2D9F3' },
   fotoPerfilPlaceholder: {
@@ -298,105 +773,171 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#E2D9F3',
   },
   logo: { width: 110, height: 36 },
-  headerTitleBox: {
-    marginBottom: 20, paddingHorizontal: 4,
-  },
-  headerTitleText: {
-    fontSize: 26, fontWeight: '800', color: '#301971', marginBottom: 4,
-  },
-  headerSubText: {
-    fontSize: 15, color: '#9163CB', fontWeight: '600',
-  },
 
-  inputContainer: {
-    shadowColor: '#481D94', shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1, shadowRadius: 14, elevation: 8,
-    marginBottom: 24,
-    ...Platform.select({
-      web: {
-        boxShadow: '0px 6px 14px rgba(72, 29, 148, 0.1)'
-      }
-    })
-  },
+  headerTitleBox: { marginBottom: 16, paddingHorizontal: 4 },
+  headerTitleText: { fontSize: 26, fontWeight: '800', color: '#301971', marginBottom: 4 },
+  headerSubText: { fontSize: 15, color: '#9163CB', fontWeight: '600' },
+
+  // Input
   inputBox: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: '#fff', borderRadius: 24,
-    paddingHorizontal: 20, paddingVertical: 16,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: '#fff', borderRadius: 999,
+    paddingHorizontal: 16, paddingVertical: 8,
     borderWidth: 1, borderColor: '#EDE8FA',
+    marginBottom: 12,
+    shadowColor: '#481D94', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08, shadowRadius: 10, elevation: 5,
   },
-  input: { flex: 1, fontSize: 16, color: '#301971', fontWeight: '500' },
-  clearBtn: {
-    backgroundColor: '#C4B5FD', padding: 4, borderRadius: 12,
-  },
+  input: { flex: 1, fontSize: 14, color: '#301971', fontWeight: '600' },
+  clearBtn: { backgroundColor: '#C4B5FD', padding: 4, borderRadius: 10 },
 
-  filtrosContainer: {
-    marginBottom: 24, marginHorizontal: -16,
+  // Botão filtro compacto
+  botaoEscolherFiltro: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#6B49AD',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginBottom: 20,
+    gap: 6,
   },
-  filtrosScroll: {
-    paddingHorizontal: 16, gap: 10,
+  botaoFiltroTexto: { fontSize: 13, fontWeight: '700', color: '#fff' },
+  filtrosBadge: {
+    backgroundColor: '#fff',
+    borderRadius: 999,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 5,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  filtroPil: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#fff', borderWidth: 1, borderColor: '#EDE8FA',
-    borderRadius: 50, paddingHorizontal: 16, paddingVertical: 10,
-    shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
-    ...Platform.select({
-      web: {
-        boxShadow: '0px 2px 4px rgba(107, 73, 173, 0.04)'
-      }
-    })
-  },
-  filtroPilAtivo: {
-    backgroundColor: '#6B49AD', borderColor: '#6B49AD',
-    shadowOpacity: 0.15, shadowRadius: 8, elevation: 4, shadowOffset: { width: 0, height: 4 },
-    ...Platform.select({
-      web: {
-        boxShadow: '0px 4px 8px rgba(107, 73, 173, 0.15)'
-      }
-    })
-  },
-  filtroPilTexto: {
-    fontSize: 14, fontWeight: '700', color: '#6B49AD',
-  },
-  filtroPilTextoAtivo: {
-    color: '#fff',
-  },
+  filtrosBadgeTexto: { fontSize: 10, fontWeight: '800', color: '#6B49AD' },
 
+  // Lista
   lista: { gap: 12 },
-
   vazioContainer: { alignItems: 'center', marginTop: 40, gap: 12 },
   vazioIcone: {
-    width: 76, height: 76, borderRadius: 24,
-    backgroundColor: '#EDE8FA',
+    width: 76, height: 76, borderRadius: 24, backgroundColor: '#EDE8FA',
     justifyContent: 'center', alignItems: 'center', marginBottom: 4,
   },
   vazioTitulo: { fontSize: 17, fontWeight: '700', color: '#301971' },
   vazioSub: { fontSize: 14, color: '#9163CB' },
 
+  // Cards
   card: {
-    backgroundColor: '#fff', borderRadius: 24,
-    padding: 18, flexDirection: 'row',
-    alignItems: 'center', gap: 16,
-    shadowColor: '#481D94', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08, shadowRadius: 12, elevation: 4,
-    borderWidth: 1, borderColor: '#F5F0FF',
-    ...Platform.select({
-      web: {
-        boxShadow: '0px 4px 12px rgba(72, 29, 148, 0.08)'
-      }
-    })
+    backgroundColor: '#FAFAFE', borderRadius: 18, padding: 16,
+    borderWidth: 1, borderColor: '#EDE8FA',
   },
-  cardIconeBox: {
-    width: 56, height: 56, borderRadius: 20,
+  cardTopo: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  cardIconeBox: { width: 46, height: 46, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  cardEmoji: { fontSize: 24 },
+  cardTextos: { flex: 1, gap: 4 },
+  cardNome: { fontSize: 16, fontWeight: '700', color: '#301971' },
+  cardSubtitulo: { fontSize: 13, color: '#6B49AD', fontWeight: '600' },
+  cardDivisor: { height: 1, backgroundColor: '#F0EAFF', marginVertical: 12 },
+  cardInfos: { gap: 8 },
+  cardDetalhes: { gap: 10 },
+
+  infoLinha: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  infoLinhaLabel: { fontSize: 13, fontWeight: '700', color: '#9163CB', flexShrink: 0, marginRight: 4 },
+  infoLinhaTexto: { fontSize: 13, color: '#301971', fontWeight: '600', flex: 1 },
+
+  badgeStatus: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4,
+  },
+  badgeStatusTexto: { fontSize: 11, fontWeight: '700' },
+  badgeProxima: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    alignSelf: 'flex-start', backgroundColor: '#E6F1FB',
+    borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4,
+  },
+  badgeProximaTexto: { fontSize: 11, fontWeight: '700', color: '#185FA5' },
+  badgeRealizada: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    alignSelf: 'flex-start', backgroundColor: '#EDE8FA',
+    borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4,
+  },
+  badgeRealizadaTexto: { fontSize: 11, fontWeight: '700', color: '#6B49AD' },
+  badgeIntensidade: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4,
+  },
+  badgeIntensidadeTexto: { fontSize: 11, fontWeight: '700' },
+
+  verMaisBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 4, marginTop: 10, paddingTop: 10,
+    borderTopWidth: 1, borderTopColor: '#F0EAFF',
+  },
+  verMaisTexto: { fontSize: 13, fontWeight: '700', color: '#6B49AD' },
+
+  btnArquivoCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#F0EAFF', borderRadius: 14,
+    paddingHorizontal: 12, paddingVertical: 10,
+    borderWidth: 1, borderColor: '#E2D9F3',
+  },
+  btnArquivoCardIcone: {
+    width: 30, height: 30, borderRadius: 8,
+    backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center',
+  },
+  btnArquivoCardTexto: { fontSize: 13, fontWeight: '700', color: '#481D94', flex: 1 },
+
+  // Modal filtro
+  modalFundo: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'transparent' },
+  modalCardFiltro: {
+    backgroundColor: '#fff', borderTopLeftRadius: 32, borderTopRightRadius: 32,
+    padding: 24, paddingBottom: 40,
+    shadowColor: '#301971', shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.15, shadowRadius: 20, elevation: 10,
+  },
+  modalFiltroHeader: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', marginBottom: 4,
+  },
+  modalFiltroTitulo: { fontSize: 18, fontWeight: '800', color: '#301971' },
+  modalFiltroSub: { fontSize: 13, color: '#9163CB', marginBottom: 16 },
+  modalFiltroFechar: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: '#F5F0FF', justifyContent: 'center', alignItems: 'center',
+  },
+  modalFiltroLinha: { height: 1, backgroundColor: '#F0EAFF', marginBottom: 12 },
+
+  opcaoFiltro: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 12, paddingHorizontal: 14,
+    borderRadius: 16, marginBottom: 8,
+    borderWidth: 1.5, borderColor: 'transparent',
+  },
+  opcaoFiltroAtiva: { borderColor: '#EDE8FA', backgroundColor: '#FDFBFF' },
+  opcaoFiltroIconeBox: {
+    width: 36, height: 36, borderRadius: 12,
+    justifyContent: 'center', alignItems: 'center', marginRight: 12,
+  },
+  opcaoFiltroLabel: { fontSize: 15, fontWeight: '600', color: '#6B49AD', flex: 1 },
+  opcaoFiltroLabelAtiva: { fontWeight: '800', color: '#301971' },
+
+  checkbox: {
+    width: 22, height: 22, borderRadius: 6,
+    borderWidth: 1.5, borderColor: '#C4B5FD',
     justifyContent: 'center', alignItems: 'center',
+    backgroundColor: '#F5F0FF',
   },
-  cardTextos: { flex: 1, gap: 6 },
-  cardTopo: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  cardTitulo: { flex: 1, fontSize: 17, fontWeight: '800', color: '#301971' },
-  tagTipo: {
-    borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4,
+  checkboxAtivo: { backgroundColor: '#6B49AD', borderColor: '#6B49AD' },
+
+  btnLimparFiltros: {
+    alignItems: 'center', paddingVertical: 10, marginTop: 4,
   },
-  tagTipoTexto: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
-  cardSub: { fontSize: 14, color: '#6B49AD', fontWeight: '500' },
+  btnLimparFiltrosTexto: { fontSize: 14, color: '#9163CB', fontWeight: '600' },
+
+  btnAplicarFiltros: {
+    marginTop: 12,
+    shadowColor: '#481D94', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
+  },
+  btnAplicarGradient: { borderRadius: 999, paddingVertical: 16, alignItems: 'center' },
+  btnAplicarTexto: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 2 },
 })
