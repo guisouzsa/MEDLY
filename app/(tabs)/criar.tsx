@@ -82,7 +82,11 @@ export default function Criar() {
           {OPCOES.map((op) => (
             <TouchableOpacity
               key={op.label}
-              style={[styles.itemCard, Platform.OS === 'web' && { boxShadow: `0px 10px 25px ${op.shadow}` } as any]}
+              style={[
+                styles.itemCard,
+                { borderLeftWidth: 6, borderLeftColor: op.iconColor },
+                Platform.OS === 'web' && { boxShadow: `0px 10px 25px ${op.shadow}` } as any
+              ]}
               onPress={() => router.push(op.rota as any)}
               activeOpacity={0.85}
             >
@@ -98,8 +102,8 @@ export default function Criar() {
                 <Text style={styles.cardLabel}>{op.label}</Text>
                 <Text style={styles.cardDesc}>{op.descricao}</Text>
               </View>
-              <View style={styles.chevronWrapper}>
-                <Feather name="chevron-right" size={20} color="#6B49AD" />
+              <View style={[styles.chevronWrapper, { backgroundColor: op.colors[0] }]}>
+                <Feather name="chevron-right" size={20} color={op.iconColor} />
               </View>
             </TouchableOpacity>
           ))}
