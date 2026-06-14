@@ -12,18 +12,8 @@ export async function readUriAsArrayBuffer(uri: string): Promise<ArrayBuffer> {
     return response.arrayBuffer()
   }
 
-  // fetch funciona com file://, content:// e ph:// no React Native
-  if (
-    uri.startsWith('content://') ||
-    uri.startsWith('ph://') ||
-    uri.startsWith('file://')
-  ) {
-    const response = await fetch(uri)
-    if (!response.ok) throw new Error('Não foi possível ler o arquivo.')
-    const blob = await response.blob()
-    return new Response(blob).arrayBuffer()
-  }
-
+  // No React Native (Android/iOS), sempre usar FileSystem + base64
+  // O construtor `new Response(blob).arrayBuffer()` não é confiável no Hermes/JSC
   const base64 = await FileSystem.readAsStringAsync(uri, {
     encoding: FileSystem.EncodingType.Base64,
   })
