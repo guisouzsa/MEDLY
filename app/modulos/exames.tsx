@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons'
 import { BlurView } from 'expo-blur'
 import * as DocumentPicker from 'expo-document-picker'
+import * as FileSystem from 'expo-file-system/legacy'
 import { LinearGradient } from 'expo-linear-gradient'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -101,6 +102,15 @@ function toDate(exame: Exame): Date {
   const horarioStr = exame.horario ? exame.horario.slice(0, 5) : '00:00'
   const [hora, minuto] = horarioStr.split(':').map(Number)
   return new Date(ano, mes - 1, dia, hora, minuto)
+}
+
+// ─── Copia o arquivo para diretório permanente (fix Android cache) ────────────
+
+async function copiarParaDiretorioPermanente(uri: string, nomeArq: string): Promise<string> {
+  if (Platform.OS === 'web') return uri
+  const destino = `${FileSystem.documentDirectory}${Date.now()}_${nomeArq.replace(/\s/g, '_')}`
+  await FileSystem.copyAsync({ from: uri, to: destino })
+  return destino
 }
 
 // ─── Componentes internos ─────────────────────────────────────────────────────
@@ -274,7 +284,7 @@ function ModalVisualizarArquivo({
 }) {
   return (
     <Modal visible={visivel} transparent animationType="fade" statusBarTranslucent>
-      <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} experimentalBlurMethod="dimezisBlurView" />
+      <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFillObject} experimentalBlurMethod="dimezisBlurView" />
       <LinearGradient
         colors={['rgba(26, 10, 61, 0.85)', 'rgba(48, 25, 113, 0.85)']}
         style={StyleSheet.absoluteFillObject}
@@ -500,7 +510,12 @@ export default function Exames() {
         const parts = nomeArq.split('.')
         const extRaw = parts.length > 1 ? parts.pop()!.toLowerCase() : 'pdf'
         const ext = ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp'].includes(extRaw) ? extRaw : 'pdf'
-        setArquivoLocal({ uri: asset.uri, nome: nomeArq, ext })
+
+        // ← FIX: copia para diretório permanente antes de salvar no estado
+        // O cache do DocumentPicker no Android pode ser limpo a qualquer momento
+        const uriPermanente = await copiarParaDiretorioPermanente(asset.uri, nomeArq)
+
+        setArquivoLocal({ uri: uriPermanente, nome: nomeArq, ext })
         setArquivoUrlRemota(null)
         setArquivoNome(nomeArq)
       }
@@ -669,7 +684,7 @@ export default function Exames() {
       {/* Modal cadastro/edição */}
       <Modal visible={modalVisivel} transparent animationType="none" onRequestClose={fecharModal}>
         <KeyboardAvoidingView style={styles.modalFundo} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <BlurView intensity={40} tint="dark" style={styles.modalOverlay} experimentalBlurMethod="dimezisBlurView">
+          <BlurView intensity={15} tint="dark" style={styles.modalOverlay} experimentalBlurMethod="dimezisBlurView">
             <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={fecharModal} />
           </BlurView>
           <Animated.View style={[styles.modalCard, { transform: [{ translateY: slideAnim }] }]}>
@@ -723,7 +738,6 @@ export default function Exames() {
                 </View>
                 {arquivoUrlAtual ? (
                   <View style={styles.previewContainer}>
-                    {/* Thumbnail */}
                     {isImageUrl(arquivoUrlAtual) ? (
                       <Image source={{ uri: arquivoUrlAtual }} style={styles.previewImage} resizeMode="cover" />
                     ) : (
@@ -732,12 +746,10 @@ export default function Exames() {
                         <Text style={styles.pdfIconeTexto}>PDF</Text>
                       </View>
                     )}
-                    {/* Ações */}
                     <View style={styles.previewDetalhes}>
                       <Text style={styles.previewNome} numberOfLines={1}>
                         {arquivoNome || 'Arquivo selecionado'}
                       </Text>
-                      {/* ── BOTÃO VER ARQUIVO ── */}
                       <TouchableOpacity
                         onPress={() => abrirVisualizador(arquivoUrlAtual, isImageUrl(arquivoUrlAtual))}
                         style={styles.verArquivoBtn}
@@ -752,7 +764,6 @@ export default function Exames() {
                           {isImageUrl(arquivoUrlAtual) ? 'Ver imagem' : 'Ver PDF'}
                         </Text>
                       </TouchableOpacity>
-                      {/* ── BOTÃO REMOVER ── */}
                       <TouchableOpacity onPress={removerArquivo} style={styles.removerArquivoBtn}>
                         <Feather name="trash-2" size={13} color="#dc2626" />
                         <Text style={styles.removerArquivoTexto}>Remover arquivo</Text>
@@ -785,7 +796,7 @@ export default function Exames() {
 
       {/* Modal excluir */}
       <Modal visible={modalExcluir} transparent animationType="fade" onRequestClose={() => setModalExcluir(false)}>
-        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} experimentalBlurMethod="dimezisBlurView" />
+        <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFillObject} experimentalBlurMethod="dimezisBlurView" />
         <View style={[styles.modalExcluirFundo, { backgroundColor: 'transparent' }]}>
           <View style={styles.modalExcluirCard}>
             <View style={styles.modalExcluirIcone}>
@@ -803,7 +814,6 @@ export default function Exames() {
         </View>
       </Modal>
 
-      {/* Modal visualizador de arquivo */}
       <ModalVisualizarArquivo
         visivel={viewerVisivel}
         url={viewerUrl}
@@ -988,7 +998,6 @@ const styles = StyleSheet.create({
   previewDetalhes: { flex: 1, justifyContent: 'center', gap: 8 },
   previewNome: { fontSize: 14, fontWeight: '700', color: '#301971' },
 
-  // ── NOVO: botão ver arquivo no preview ───────────────────────────────────
   verArquivoBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     backgroundColor: '#EDE8FA', borderRadius: 10,

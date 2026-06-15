@@ -908,7 +908,7 @@ export default function Medicamentos() {
       {/* Modal cadastro/edição */}
       <Modal visible={modalVisivel} transparent animationType="none">
         <KeyboardAvoidingView style={styles.modalFundo} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <BlurView intensity={40} tint="dark" style={styles.modalOverlay} experimentalBlurMethod="dimezisBlurView">
+          <BlurView intensity={15} tint="dark" style={styles.modalOverlay} experimentalBlurMethod="dimezisBlurView">
             <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={fecharModal} />
           </BlurView>
           <Animated.View style={[styles.modalCard, { transform: [{ translateY: slideAnim }] }]}>
@@ -1064,7 +1064,7 @@ export default function Medicamentos() {
 
       {/* Modal excluir */}
       <Modal visible={modalExcluir} transparent animationType="fade" onRequestClose={() => {}}>
-        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} experimentalBlurMethod="dimezisBlurView" />
+        <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFillObject} experimentalBlurMethod="dimezisBlurView" />
         <View style={[styles.modalExcluirFundo, { backgroundColor: 'transparent' }]}>
           <View style={styles.modalExcluirCard}>
             <View style={styles.modalExcluirIcone}>
@@ -1084,7 +1084,7 @@ export default function Medicamentos() {
 
       {/* Modal pausar */}
       <Modal visible={modalPausar} transparent animationType="fade" onRequestClose={() => {}}>
-        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} experimentalBlurMethod="dimezisBlurView" />
+        <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFillObject} experimentalBlurMethod="dimezisBlurView" />
         <View style={[styles.modalCentroFundo, { backgroundColor: 'transparent' }]}>
           <View style={styles.modalCentroCard}>
             <LinearGradient
