@@ -1,29 +1,28 @@
 import { Feather } from '@expo/vector-icons'
 import { BlurView } from 'expo-blur'
 
-import { readUriAsArrayBuffer, extensionFromUri, mimeFromExtension } from '../../src/lib/storage'
 import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
 import { router } from 'expo-router'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
+  ActivityIndicator,
+  Animated,
   Dimensions,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
-  Alert,
-  Modal,
-  ActivityIndicator,
-  Animated,
+  View
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import ModalAlerta from '../../src/components/ModalAlerta'
+import { extensionFromUri, mimeFromExtension, readUriAsArrayBuffer } from '../../src/lib/storage'
 import { supabase } from '../../src/lib/supabase'
 
 const { width } = Dimensions.get('window')
@@ -31,8 +30,8 @@ const CARD_W = Math.min(width * 0.88, 420)
 
 function ModalSair({ visivel, onCancelar, onConfirmar }: { visivel: boolean; onCancelar: () => void; onConfirmar: () => void }) {
   return (
-    <Modal visible={visivel} transparent animationType="fade" onRequestClose={() => {}}>
-      <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} experimentalBlurMethod="dimezisBlurView" />
+    <Modal visible={visivel} transparent animationType="fade" onRequestClose={() => { }}>
+      <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFillObject} experimentalBlurMethod="dimezisBlurView" />
       <View style={[styles.modalFundoSair, { backgroundColor: 'transparent' }]}>
         <View style={styles.modalCardSair}>
           <Text style={styles.modalTituloSair}>Sair da conta</Text>
@@ -176,9 +175,7 @@ export default function Perfil() {
     try {
       let finalFotoUrl = fotoUri
 
-      // Se a foto foi alterada ou removida
       if (fotoUri !== fotoUrlOriginal) {
-        // 1. Se foi removida (fotoUri é null)
         if (fotoUri === null) {
           finalFotoUrl = null
           if (fotoUrlOriginal) {
@@ -193,9 +190,7 @@ export default function Perfil() {
               console.log('Erro ao deletar foto do storage:', e)
             }
           }
-        }
-        // 2. Se uma nova foto local foi selecionada
-        else if (fotoUri.startsWith('file://') || fotoUri.startsWith('ph://') || fotoUri.startsWith('content://') || Platform.OS === 'web') {
+        } else if (fotoUri.startsWith('file://') || fotoUri.startsWith('ph://') || fotoUri.startsWith('content://') || Platform.OS === 'web') {
           const ext = extensionFromUri(fotoUri, 'jpg')
           const fileName = `${usuarioId}.${ext}`
           const uploadData = await readUriAsArrayBuffer(fotoUri)
@@ -216,7 +211,6 @@ export default function Perfil() {
         }
       }
 
-      // Atualizar tabela perfis
       const { error: dbError } = await supabase
         .from('perfis')
         .update({
@@ -226,9 +220,7 @@ export default function Perfil() {
         })
         .eq('id', usuarioId)
 
-      if (dbError) {
-        throw dbError
-      }
+      if (dbError) throw dbError
 
       setFotoUrlOriginal(finalFotoUrl)
       setFotoUri(finalFotoUrl)
@@ -253,7 +245,6 @@ export default function Perfil() {
     setCarregando(true)
     setModalDeletarVisivel(false)
     try {
-      // Deletar a foto do bucket avatares
       if (fotoUrlOriginal) {
         try {
           const urlParts = fotoUrlOriginal.split('/avatares/')
@@ -272,18 +263,15 @@ export default function Perfil() {
         console.log('Erro no fallback de exclusão da foto antes de deletar conta:', e)
       }
 
-      // 1. Apaga do banco (se não houver RPC de exclusão total configurada, no mínimo os dados são apagados)
       const { error: dbError } = await supabase.from('perfis').delete().eq('id', usuarioId)
       if (dbError) throw dbError
 
-      // 2. Tenta chamar uma RPC se existir (padrão em alguns setups)
       try {
         await supabase.rpc('delete_user')
       } catch (rpcErr) {
         console.log('Erro ao chamar RPC delete_user:', rpcErr)
       }
 
-      // 3. Desloga e envia para a tela inicial
       await supabase.auth.signOut()
       router.replace('/auth')
     } catch (error: any) {
@@ -300,7 +288,7 @@ export default function Perfil() {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
@@ -310,15 +298,16 @@ export default function Perfil() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Header com botão voltar */}
+          {/* Header — padrão dos módulos */}
           <View style={styles.headerCard}>
+            <View style={{ width: 44 }} />
+            <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
             <TouchableOpacity style={styles.voltar} onPress={() => router.back()}>
               <Feather name="arrow-left" size={18} color="#6B49AD" />
             </TouchableOpacity>
-            <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
-            <View style={{ width: 36 }} />
           </View>
 
+          {/* Título — padrão dos módulos */}
           <LinearGradient
             colors={['#6B49AD', '#6843B1', '#481D94']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
@@ -333,7 +322,7 @@ export default function Perfil() {
             </View>
           ) : (
             <>
-              {/* Área da Foto (fora do card, acima) */}
+              {/* Área da Foto */}
               <View style={styles.fotoContainer}>
                 <Animated.View style={[styles.gradientRingContainer, { transform: [{ rotate: spin }] }]}>
                   <LinearGradient
@@ -377,7 +366,6 @@ export default function Perfil() {
 
               {/* Card de informações */}
               <View style={[styles.card, { width: CARD_W }]}>
-                {/* Formulário */}
                 <View style={styles.form}>
                   <View style={styles.campoWrapper}>
                     <Text style={styles.campoLabel}>NOME EXIBIDO</Text>
@@ -474,8 +462,8 @@ export default function Perfil() {
         onFechar={() => setModal(m => ({ ...m, visivel: false }))}
       />
 
-      <Modal visible={modalDeletarVisivel} transparent animationType="fade" onRequestClose={() => {}}>
-        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} experimentalBlurMethod="dimezisBlurView" />
+      <Modal visible={modalDeletarVisivel} transparent animationType="fade" onRequestClose={() => { }}>
+        <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFillObject} experimentalBlurMethod="dimezisBlurView" />
         <View style={[styles.modalFundoDeletar, { backgroundColor: 'transparent' }]}>
           <View style={styles.modalDeletarCard}>
             <View style={styles.modalDeletarIcone}>
@@ -494,6 +482,7 @@ export default function Perfil() {
           </View>
         </View>
       </Modal>
+
       <ModalSair visivel={modalSairVisivel} onCancelar={() => setModalSairVisivel(false)} onConfirmar={sair} />
     </SafeAreaView>
   )
@@ -507,32 +496,45 @@ const styles = StyleSheet.create({
   scroll: {
     flexGrow: 1,
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingTop: 0,
     paddingBottom: 40,
   },
+
+  // ── Header — padrão dos módulos ───────────────────────────────────────────────
   headerCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#fff',
-    borderRadius: 60,
-    width: '100%',
-    paddingVertical: 10,
+    borderRadius: 999,
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 12,
     paddingHorizontal: 14,
-    marginTop: 10,
-    marginBottom: 14,
+    paddingVertical: 10,
     shadowColor: '#6B49AD',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
-    elevation: 6,
+    elevation: 5,
+    alignSelf: 'stretch',
   },
   logo: {
-    width: 100,
+    width: 110,
     height: 36,
   },
+  voltar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F0EAFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // ── Título — padrão dos módulos ───────────────────────────────────────────────
   cardTituloLista: {
-    width: '100%',
+    marginHorizontal: 16,
     borderRadius: 50,
     paddingVertical: 14,
     alignItems: 'center',
@@ -542,6 +544,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
     marginBottom: 20,
+    alignSelf: 'stretch',
   },
   cardTituloTexto: {
     fontSize: 14,
@@ -549,14 +552,8 @@ const styles = StyleSheet.create({
     color: '#fff',
     letterSpacing: 3,
   },
-  voltar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F0EAFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+
+  // ── Loading ──────────────────────────────────────────────────────────────────
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -568,6 +565,8 @@ const styles = StyleSheet.create({
     color: '#6B49AD',
     fontWeight: '600',
   },
+
+  // ── Card de informações ──────────────────────────────────────────────────────
   card: {
     backgroundColor: '#fff',
     borderRadius: 40,
@@ -580,6 +579,8 @@ const styles = StyleSheet.create({
     elevation: 8,
     alignItems: 'center',
   },
+
+  // ── Foto ─────────────────────────────────────────────────────────────────────
   fotoContainer: {
     position: 'relative',
     width: 140,
@@ -650,6 +651,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+
+  // ── Formulário ───────────────────────────────────────────────────────────────
   form: {
     width: '100%',
   },
@@ -698,6 +701,8 @@ const styles = StyleSheet.create({
     width: '100%',
     marginVertical: 24,
   },
+
+  // ── Botões ───────────────────────────────────────────────────────────────────
   botaoWrapper: {
     shadowColor: '#301971',
     shadowOffset: { width: 0, height: 6 },
@@ -752,6 +757,8 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 2,
   },
+
+  // ── Modal deletar ────────────────────────────────────────────────────────────
   modalFundoDeletar: {
     flex: 1,
     backgroundColor: '#00000055',
@@ -825,6 +832,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
+
   // ── Botão sair ───────────────────────────────────────────────────────────────
   botaoSairWrapper: {
     marginTop: 14,
@@ -847,7 +855,7 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
   },
 
-  // ── Modal Sair ───────────────────────────────────────────────────────────────
+  // ── Modal sair ───────────────────────────────────────────────────────────────
   modalFundoSair: {
     flex: 1,
     backgroundColor: '#00000066',
