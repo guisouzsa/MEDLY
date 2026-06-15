@@ -3,9 +3,10 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { router, useFocusEffect } from 'expo-router'
 import { useCallback, useEffect, useState } from 'react'
 import {
-  Image, Modal, Platform,
-  ScrollView, StatusBar, StyleSheet, Text,
-  TouchableOpacity, View,
+  Image,
+  Platform,
+  ScrollView, StyleSheet, Text,
+  TouchableOpacity, View
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { getEventsForDate, getProximoLembrete } from '../../src/lib/events'
@@ -14,7 +15,6 @@ import { supabase } from '../../src/lib/supabase'
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
-// ─── "Remédios" substituiu "Medicamentos" ────────────────────────────────────
 const ACOES_LINHA1 = [
   { label: 'Remédios', icone: 'activity', rota: '/modulos/medicamentos' },
   { label: 'Consultas', icone: 'calendar', rota: '/modulos/consultas' },
@@ -22,7 +22,6 @@ const ACOES_LINHA1 = [
   { label: 'Exames', icone: 'file-text', rota: '/modulos/exames' },
 ]
 
-// ─── Calendário: igual ao da tela de calendário (semanas row a row) ──────────
 function getDiasDoMes(ano: number, mes: number) {
   const primeiroDia = new Date(ano, mes, 1).getDay()
   const totalDias = new Date(ano, mes + 1, 0).getDate()
@@ -48,7 +47,6 @@ function getData() {
   return `${a.getDate()} de ${MESES[a.getMonth()]}`
 }
 
-// ─── Calendário responsivo (sem flexWrap, semanas em linhas) ─────────────────
 function Calendario({ data }: { data: any }) {
   const hoje = new Date()
   const [mes, setMes] = useState(hoje.getMonth())
@@ -61,7 +59,6 @@ function Calendario({ data }: { data: any }) {
 
   return (
     <View style={styles.calendarioCard}>
-      {/* Nav */}
       <View style={styles.calendarioNav}>
         <TouchableOpacity onPress={anterior} style={styles.navBtn}>
           <Feather name="chevron-left" size={20} color="#6B49AD" />
@@ -79,14 +76,12 @@ function Calendario({ data }: { data: any }) {
         </TouchableOpacity>
       </View>
 
-      {/* Dias da semana */}
       <View style={styles.semanaRow}>
         {DIAS_SEMANA.map(d => (
           <Text key={d} style={styles.semanaTexto}>{d}</Text>
         ))}
       </View>
 
-      {/* Grade — uma View por semana, cada célula com flex:1 */}
       <View style={styles.grade}>
         {semanas.map((semana, si) => (
           <View key={si} style={styles.semanaLinha}>
@@ -125,7 +120,6 @@ function Calendario({ data }: { data: any }) {
         ))}
       </View>
 
-      {/* Legenda */}
       <View style={styles.legendaDivisor} />
       <View style={styles.legendaRow}>
         <View style={styles.legendaItem}>
@@ -141,7 +135,6 @@ function Calendario({ data }: { data: any }) {
   )
 }
 
-// ─── Ações rápidas: responsivo com flexWrap e largura controlada ──────────────
 function LinhaAcoes({ acoes }: { acoes: typeof ACOES_LINHA1 }) {
   return (
     <View style={styles.acoesLinha}>
@@ -191,7 +184,7 @@ export default function Dashboard() {
 
           const { data: perfil, error: perfilError } = await supabase
             .from('perfis').select('foto_url, nome').eq('id', user.id).single()
-          
+
           if (perfilError && perfilError.code !== 'PGRST116') {
             console.log('Erro ao carregar perfil:', perfilError.message)
           }
@@ -234,9 +227,8 @@ export default function Dashboard() {
     }, [])
   )
 
-
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -273,18 +265,13 @@ export default function Dashboard() {
           </View>
         </LinearGradient>
 
-        {/* CARD 3 — próximo lembrete
-            card3Fora = borda externa (padding pequeno, border radius maior)
-            card3Inner = conteúdo interno com overflow:hidden
-            Imagem: alinhada ao fim, sem margem, "vazando" pelas bordas de baixo e lateral direita
-        */}
+        {/* CARD 3 — próximo lembrete */}
         <View style={styles.card3Fora}>
           <LinearGradient
             colors={['#E7DDFF', '#A780FF']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={styles.card3Inner}
           >
-            {/* Texto centralizado verticalmente, sem centralizar a foto */}
             <View style={styles.card3Esquerda}>
               <Text style={styles.card3Label}>PRÓXIMO LEMBRETE</Text>
               <Text style={styles.card3Tipo}>
@@ -294,8 +281,6 @@ export default function Dashboard() {
                 {proximoLembrete ? proximoLembrete.descricao : 'Nenhum lembrete para os próximos 30 dias.'}
               </Text>
             </View>
-            {/* Imagem encosta nas bordas: marginBottom e marginRight negativos
-                para ultrapassar o padding e sumir as bordas de baixo e direita */}
             <Image
               source={require('../../assets/images/foto-card-lembrete.png')}
               style={styles.card3Img}
@@ -322,21 +307,21 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: '#F5F0FF',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    // ← removido: paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0
+    // O SafeAreaView com edges={['top']} já cuida disso em todas as plataformas
   },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 16, paddingTop: 12 },
+  scrollContent: { paddingHorizontal: 16, paddingTop: 0 }, // ← era 12, agora 0
 
   // ── Header ──────────────────────────────────────────────────────────────────
   card1: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#fff', borderRadius: 60, paddingHorizontal: 12, paddingVertical: 8,
+    backgroundColor: '#fff', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10,
+    marginTop: 16, // ← adicionado, igual às outras telas
     marginBottom: 12,
-    shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 6,
+    shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5,
     ...Platform.select({
-      web: {
-        boxShadow: '0px 4px 12px rgba(107, 73, 173, 0.1)'
-      }
+      web: { boxShadow: '0px 4px 12px rgba(107, 73, 173, 0.1)' }
     })
   },
   fotoPerfil: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#E2D9F3' },
@@ -345,7 +330,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#EDE8FA', justifyContent: 'center', alignItems: 'center',
     borderWidth: 2, borderColor: '#E2D9F3',
   },
-  logoHeader: { width: 100, height: 36 },
+  logoHeader: { width: 110, height: 36 },
 
   // ── Saudação ─────────────────────────────────────────────────────────────────
   card2: {
@@ -354,9 +339,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     shadowColor: '#301971', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 14, elevation: 10,
     ...Platform.select({
-      web: {
-        boxShadow: '0px 6px 14px rgba(48, 25, 113, 0.3)'
-      }
+      web: { boxShadow: '0px 6px 14px rgba(48, 25, 113, 0.3)' }
     })
   },
   card2Esquerda: { flex: 1 },
@@ -367,23 +350,20 @@ const styles = StyleSheet.create({
   card2Hora: { color: '#fff', fontSize: 42, fontWeight: '800', lineHeight: 46 },
 
   // ── Lembrete ─────────────────────────────────────────────────────────────────
-  // card3Fora: borda externa fina (padding=5), radius ligeiramente maior que o inner
   card3Fora: {
     backgroundColor: '#EDE8FA',
     borderRadius: 26,
     padding: 6,
     marginBottom: 12,
   },
-  // card3Inner: conteúdo; overflow:hidden garante que a imagem "vaze" por dentro
   card3Inner: {
     flexDirection: 'row',
-    alignItems: 'stretch',          // estica ambos os filhos até a mesma altura
+    alignItems: 'stretch',
     borderRadius: 22,
     overflow: 'hidden',
     paddingLeft: 20,
     minHeight: 130,
   },
-  // Texto ocupa o espaço livre e fica centralizado verticalmente
   card3Esquerda: {
     flex: 1,
     justifyContent: 'center',
@@ -393,12 +373,11 @@ const styles = StyleSheet.create({
   card3Label: { fontSize: 10, fontWeight: '700', color: '#6B49AD', letterSpacing: 1, marginBottom: 8 },
   card3Tipo: { fontSize: 16, fontWeight: '700', color: '#301971', marginBottom: 4 },
   card3Desc: { fontSize: 13, fontWeight: '600', color: '#301971', lineHeight: 18 },
-  // Imagem: largura e altura fixas; margens negativas fazem sumir bordas de baixo e direita
   card3Img: {
     width: 130,
     height: 150,
-    marginBottom: -5,   // vai além da borda inferior do card3Inner
-    marginRight: -5,    // vai além da borda direita do card3Inner
+    marginBottom: -5,
+    marginRight: -5,
     alignSelf: 'flex-end',
   },
 
@@ -407,13 +386,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff', borderRadius: 24, padding: 20, marginBottom: 12,
     shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 4,
     ...Platform.select({
-      web: {
-        boxShadow: '0px 4px 12px rgba(107, 73, 173, 0.08)'
-      }
+      web: { boxShadow: '0px 4px 12px rgba(107, 73, 173, 0.08)' }
     })
   },
   acoesTitle: { fontSize: 15, fontWeight: '700', color: '#301971', marginBottom: 16 },
-  // flex: 1 em cada botão + row = divide igualmente sem quebrar
   acoesLinha: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -430,14 +406,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     shadowColor: '#481D94', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
     ...Platform.select({
-      web: {
-        boxShadow: '0px 4px 8px rgba(72, 29, 148, 0.3)'
-      }
+      web: { boxShadow: '0px 4px 8px rgba(72, 29, 148, 0.3)' }
     })
   },
   acaoLabel: { fontSize: 11, fontWeight: '700', color: '#301971', textAlign: 'center' },
 
-  // ── Calendário (idêntico ao da tela de calendário) ───────────────────────────
+  // ── Calendário ───────────────────────────────────────────────────────────────
   calendarioCard: {
     backgroundColor: '#fff', borderRadius: 24, padding: 16, marginBottom: 12,
   },
@@ -456,7 +430,6 @@ const styles = StyleSheet.create({
   semanaRow: { flexDirection: 'row', marginBottom: 8 },
   semanaTexto: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '700', color: '#9163CB' },
 
-  // Grade sem flexWrap: uma linha por semana
   grade: { flexDirection: 'column' },
   semanaLinha: { flexDirection: 'row', marginBottom: 4 },
   diaCell: { flex: 1, alignItems: 'center' },
@@ -472,5 +445,4 @@ const styles = StyleSheet.create({
   legendaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendaQuadrado: { width: 14, height: 14, borderRadius: 4 },
   legendaTexto: { fontSize: 10, color: '#9163CB', fontWeight: '600' },
-
 })

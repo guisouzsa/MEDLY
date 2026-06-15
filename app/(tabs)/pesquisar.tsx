@@ -132,24 +132,21 @@ function ModalVisualizarArquivo({
 }) {
   return (
     <Modal visible={visivel} transparent animationType="fade" statusBarTranslucent>
-      <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} experimentalBlurMethod="dimezisBlurView" />
+      <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFillObject} experimentalBlurMethod="dimezisBlurView" />
       <LinearGradient
         colors={['rgba(26, 10, 61, 0.85)', 'rgba(48, 25, 113, 0.85)']}
         style={StyleSheet.absoluteFillObject}
       />
       <View style={styles.viewerFundo}>
         <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
-          {/* Header */}
           <View style={styles.viewerHeader}>
             <TouchableOpacity onPress={onFechar} style={styles.viewerVoltarBtn} activeOpacity={0.8}>
               <Feather name="arrow-left" size={16} color="#fff" style={{ marginRight: 4 }} />
               <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>Voltar</Text>
             </TouchableOpacity>
-
             <Text style={styles.viewerTitulo} numberOfLines={1}>
               {isImage ? 'Visualizar imagem' : 'Visualizar arquivo'}
             </Text>
-
             <View style={styles.viewerRightContainer}>
               <TouchableOpacity
                 onPress={() => import('expo-web-browser').then(wb => wb.openBrowserAsync(url))}
@@ -158,21 +155,14 @@ function ModalVisualizarArquivo({
               >
                 <Feather name="external-link" size={18} color="#fff" />
               </TouchableOpacity>
-
               <TouchableOpacity onPress={onFechar} style={styles.viewerFechar} activeOpacity={0.8}>
                 <Feather name="x" size={20} color="#fff" />
               </TouchableOpacity>
             </View>
           </View>
-
-          {/* Conteúdo */}
           <View style={styles.viewerConteudo}>
             {isImage ? (
-              <Image
-                source={{ uri: url }}
-                style={styles.viewerImagem}
-                resizeMode="contain"
-              />
+              <Image source={{ uri: url }} style={styles.viewerImagem} resizeMode="contain" />
             ) : (
               <View style={styles.viewerPdfContainer}>
                 <View style={styles.viewerPdfIcone}>
@@ -419,8 +409,6 @@ function CardConsulta({ dados }: { dados: any }) {
   )
 }
 
-// ── CardExame agora recebe onVerArquivo ao invés de abrir WebBrowser direto ──
-
 function CardExame({ dados, onVerArquivo }: {
   dados: any
   onVerArquivo: (url: string, isImage: boolean) => void
@@ -575,13 +563,12 @@ function CardSintoma({ dados }: { dados: any }) {
 
 export default function Pesquisar() {
   const [busca, setBusca] = useState('')
-  const [filtros, setFiltros] = useState<TipoFiltro[]>([])
+  const [filtro, setFiltro] = useState<TipoFiltro | null>(null)
   const [itens, setItens] = useState<Item[]>([])
   const [carregando, setCarregando] = useState(false)
   const [perfilFoto, setPerfilFoto] = useState<string | null>(null)
   const [modalFiltroVisivel, setModalFiltroVisivel] = useState(false)
 
-  // ── Viewer de arquivo ────────────────────────────────────────────────────
   const [viewerVisivel, setViewerVisivel] = useState(false)
   const [viewerUrl, setViewerUrl] = useState('')
   const [viewerIsImage, setViewerIsImage] = useState(false)
@@ -610,7 +597,7 @@ export default function Pesquisar() {
           }
 
           const resultado: Item[] = []
-          const deveBuscar = (tipo: TipoFiltro) => filtros.length === 0 || filtros.includes(tipo)
+          const deveBuscar = (tipo: TipoFiltro) => filtro === null || filtro === tipo
 
           if (deveBuscar('medicamentos')) {
             const { data } = await supabase
@@ -672,14 +659,8 @@ export default function Pesquisar() {
         }
       }
       carregarDados()
-    }, [filtros])
+    }, [filtro])
   )
-
-  function toggleFiltro(valor: TipoFiltro) {
-    setFiltros(prev =>
-      prev.includes(valor) ? prev.filter(f => f !== valor) : [...prev, valor]
-    )
-  }
 
   const itensFiltrados = itens.filter(item =>
     item.titulo.toLowerCase().includes(busca.toLowerCase()) ||
@@ -690,21 +671,19 @@ export default function Pesquisar() {
     if (item.tipo === 'medicamentos') return <CardMedicamento key={`med-${item.id}`} dados={item.dados} />
     if (item.tipo === 'consultas') return <CardConsulta key={`con-${item.id}`} dados={item.dados} />
     if (item.tipo === 'exames') return (
-      <CardExame
-        key={`exa-${item.id}`}
-        dados={item.dados}
-        onVerArquivo={abrirVisualizador}
-      />
+      <CardExame key={`exa-${item.id}`} dados={item.dados} onVerArquivo={abrirVisualizador} />
     )
     if (item.tipo === 'sintomas') return <CardSintoma key={`sin-${item.id}`} dados={item.dados} />
     return null
   }
 
+  const filtroAtivo = FILTROS.find(f => f.valor === filtro)
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
-        {/* Card Perfil */}
+        {/* Card Perfil — padrão dos módulos */}
         <View style={styles.cardPerfil}>
           <TouchableOpacity onPress={() => router.push('/modulos/perfil' as any)} activeOpacity={0.85}>
             {perfilFoto ? (
@@ -750,11 +729,16 @@ export default function Pesquisar() {
           style={styles.botaoEscolherFiltro}
         >
           <Feather name="filter" size={14} color="#fff" />
-          <Text style={styles.botaoFiltroTexto}>Filtrar categoria</Text>
-          {filtros.length > 0 && (
-            <View style={styles.filtrosBadge}>
-              <Text style={styles.filtrosBadgeTexto}>{filtros.length}</Text>
-            </View>
+          <Text style={styles.botaoFiltroTexto}>
+            {filtroAtivo ? filtroAtivo.label : 'Filtrar categoria'}
+          </Text>
+          {filtro !== null && (
+            <TouchableOpacity
+              onPress={(e) => { e.stopPropagation(); setFiltro(null) }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Feather name="x" size={13} color="#fff" />
+            </TouchableOpacity>
           )}
         </TouchableOpacity>
 
@@ -778,10 +762,10 @@ export default function Pesquisar() {
         <View style={{ height: 120 }} />
       </ScrollView>
 
-      {/* Modal de filtros com multi-select */}
+      {/* Modal de filtro */}
       <Modal visible={modalFiltroVisivel} transparent animationType="fade" onRequestClose={() => setModalFiltroVisivel(false)}>
         <View style={styles.modalFundo}>
-          <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} experimentalBlurMethod="dimezisBlurView" />
+          <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFillObject} experimentalBlurMethod="dimezisBlurView" />
           <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setModalFiltroVisivel(false)} />
           <View style={styles.modalCardFiltro}>
             <View style={styles.modalFiltroHeader}>
@@ -790,30 +774,29 @@ export default function Pesquisar() {
                 <Feather name="x" size={20} color="#6B49AD" />
               </TouchableOpacity>
             </View>
-            <Text style={styles.modalFiltroSub}>Selecione um ou mais tipos de registro</Text>
+            <Text style={styles.modalFiltroSub}>Selecione uma categoria para filtrar</Text>
             <View style={styles.modalFiltroLinha} />
 
-            {/* Opção "Todos" */}
             <TouchableOpacity
-              onPress={() => setFiltros([])}
+              onPress={() => { setFiltro(null); setModalFiltroVisivel(false) }}
               activeOpacity={0.7}
-              style={[styles.opcaoFiltro, filtros.length === 0 && styles.opcaoFiltroAtiva]}
+              style={[styles.opcaoFiltro, filtro === null && styles.opcaoFiltroAtiva]}
             >
-              <View style={[styles.opcaoFiltroIconeBox, { backgroundColor: filtros.length === 0 ? '#6B49AD' : '#F5F0FF' }]}>
-                <Feather name="grid" size={16} color={filtros.length === 0 ? '#fff' : '#6B49AD'} />
+              <View style={[styles.opcaoFiltroIconeBox, { backgroundColor: filtro === null ? '#6B49AD' : '#F5F0FF' }]}>
+                <Feather name="grid" size={16} color={filtro === null ? '#fff' : '#6B49AD'} />
               </View>
-              <Text style={[styles.opcaoFiltroLabel, filtros.length === 0 && styles.opcaoFiltroLabelAtiva]}>
+              <Text style={[styles.opcaoFiltroLabel, filtro === null && styles.opcaoFiltroLabelAtiva]}>
                 Todos os registros
               </Text>
-              {filtros.length === 0 && <Feather name="check" size={18} color="#6B49AD" style={{ marginLeft: 'auto' }} />}
+              {filtro === null && <Feather name="check" size={18} color="#6B49AD" style={{ marginLeft: 'auto' }} />}
             </TouchableOpacity>
 
             {FILTROS.map((f) => {
-              const ativo = filtros.includes(f.valor)
+              const ativo = filtro === f.valor
               return (
                 <TouchableOpacity
                   key={f.valor}
-                  onPress={() => toggleFiltro(f.valor)}
+                  onPress={() => { setFiltro(f.valor); setModalFiltroVisivel(false) }}
                   activeOpacity={0.7}
                   style={[styles.opcaoFiltro, ativo && styles.opcaoFiltroAtiva]}
                 >
@@ -823,42 +806,14 @@ export default function Pesquisar() {
                   <Text style={[styles.opcaoFiltroLabel, ativo && styles.opcaoFiltroLabelAtiva]}>
                     {f.label}
                   </Text>
-                  <View style={[styles.checkbox, ativo && styles.checkboxAtivo]}>
-                    {ativo && <Feather name="check" size={12} color="#fff" />}
-                  </View>
+                  {ativo && <Feather name="check" size={18} color="#6B49AD" style={{ marginLeft: 'auto' }} />}
                 </TouchableOpacity>
               )
             })}
-
-            {filtros.length > 0 && (
-              <TouchableOpacity
-                onPress={() => { setFiltros([]); setModalFiltroVisivel(false) }}
-                style={styles.btnLimparFiltros}
-              >
-                <Text style={styles.btnLimparFiltrosTexto}>Limpar filtros</Text>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity
-              onPress={() => setModalFiltroVisivel(false)}
-              activeOpacity={0.85}
-              style={styles.btnAplicarFiltros}
-            >
-              <LinearGradient
-                colors={['#6B49AD', '#481D94']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={styles.btnAplicarGradient}
-              >
-                <Text style={styles.btnAplicarTexto}>
-                  {filtros.length === 0 ? 'VER TODOS' : `APLICAR ${filtros.length} FILTRO${filtros.length > 1 ? 'S' : ''}`}
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* Modal visualizador de arquivo */}
       <ModalVisualizarArquivo
         visivel={viewerVisivel}
         url={viewerUrl}
@@ -872,16 +827,32 @@ export default function Pesquisar() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F5F0FF' },
-  scroll: { paddingHorizontal: 16, paddingTop: 12 },
+  safe: {
+    flex: 1,
+    backgroundColor: '#F5F0FF',
+  },
+  scroll: {
+    paddingTop: 0,
+    paddingBottom: 20,
+  },
 
-  // Header
+  // ── Header — padrão dos módulos ───────────────────────────────────────────
   cardPerfil: {
-    backgroundColor: '#fff', marginHorizontal: 0, marginTop: 0,
-    borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10,
-    flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between',
-    shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1, shadowRadius: 12, elevation: 5, marginBottom: 14,
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 14,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#6B49AD',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
   },
   fotoPerfil: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#E2D9F3' },
   fotoPerfilPlaceholder: {
@@ -890,39 +861,37 @@ const styles = StyleSheet.create({
   },
   logo: { width: 110, height: 36 },
 
-  headerTitleBox: { marginBottom: 16, paddingHorizontal: 4 },
+  headerTitleBox: { marginBottom: 16, paddingHorizontal: 20 },
   headerTitleText: { fontSize: 26, fontWeight: '800', color: '#301971', marginBottom: 4 },
   headerSubText: { fontSize: 15, color: '#9163CB', fontWeight: '600' },
 
   // Input
   inputBox: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: '#fff', borderRadius: 999,
-    paddingHorizontal: 16, paddingVertical: 8,
-    borderWidth: 1, borderColor: '#EDE8FA',
+    paddingHorizontal: 18, paddingVertical: 11,
+    borderWidth: 1.5, borderColor: '#EBE5F9',
     marginBottom: 12,
-    shadowColor: '#481D94', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08, shadowRadius: 10, elevation: 5,
+    marginHorizontal: 16,
+    shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06, shadowRadius: 10, elevation: 3,
   },
-  input: { flex: 1, fontSize: 14, color: '#301971', fontWeight: '600' },
+  input: { flex: 1, fontSize: 15, color: '#301971', fontWeight: '600' },
   clearBtn: { backgroundColor: '#C4B5FD', padding: 4, borderRadius: 10 },
 
-  // Botão filtro compacto
+  // Botão filtro
   botaoEscolherFiltro: {
     flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start',
-    backgroundColor: '#6B49AD', borderRadius: 999,
-    paddingHorizontal: 14, paddingVertical: 8, marginBottom: 20, gap: 6,
+    backgroundColor: '#51309A', borderRadius: 999,
+    paddingHorizontal: 16, paddingVertical: 9, marginBottom: 20, gap: 6,
+    marginHorizontal: 16,
+    shadowColor: '#51309A', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15, shadowRadius: 6, elevation: 3,
   },
   botaoFiltroTexto: { fontSize: 13, fontWeight: '700', color: '#fff' },
-  filtrosBadge: {
-    backgroundColor: '#fff', borderRadius: 999,
-    minWidth: 18, height: 18, paddingHorizontal: 5,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  filtrosBadgeTexto: { fontSize: 10, fontWeight: '800', color: '#6B49AD' },
 
   // Lista
-  lista: { gap: 12 },
+  lista: { gap: 12, marginHorizontal: 16 },
   vazioContainer: { alignItems: 'center', marginTop: 40, gap: 12 },
   vazioIcone: {
     width: 76, height: 76, borderRadius: 24, backgroundColor: '#EDE8FA',
@@ -1026,26 +995,7 @@ const styles = StyleSheet.create({
   opcaoFiltroLabel: { fontSize: 15, fontWeight: '600', color: '#6B49AD', flex: 1 },
   opcaoFiltroLabelAtiva: { fontWeight: '800', color: '#301971' },
 
-  checkbox: {
-    width: 22, height: 22, borderRadius: 6,
-    borderWidth: 1.5, borderColor: '#C4B5FD',
-    justifyContent: 'center', alignItems: 'center',
-    backgroundColor: '#F5F0FF',
-  },
-  checkboxAtivo: { backgroundColor: '#6B49AD', borderColor: '#6B49AD' },
-
-  btnLimparFiltros: { alignItems: 'center', paddingVertical: 10, marginTop: 4 },
-  btnLimparFiltrosTexto: { fontSize: 14, color: '#9163CB', fontWeight: '600' },
-
-  btnAplicarFiltros: {
-    marginTop: 12,
-    shadowColor: '#481D94', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
-  },
-  btnAplicarGradient: { borderRadius: 999, paddingVertical: 16, alignItems: 'center' },
-  btnAplicarTexto: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 2 },
-
-  // ── Visualizador de arquivo ───────────────────────────────────────────────
+  // Visualizador de arquivo
   viewerFundo: { flex: 1, backgroundColor: 'transparent' },
   viewerHeader: {
     flexDirection: 'row', alignItems: 'center',

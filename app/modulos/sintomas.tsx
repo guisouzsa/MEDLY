@@ -545,7 +545,7 @@ export default function Sintomas() {
 
             <Modal visible={modalVisivel} transparent animationType="none" onRequestClose={fecharModal}>
                 <KeyboardAvoidingView style={styles.modalFundo} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-                    <BlurView intensity={40} tint="dark" style={styles.modalOverlay} experimentalBlurMethod="dimezisBlurView">
+                    <BlurView intensity={15} tint="dark" style={styles.modalOverlay} experimentalBlurMethod="dimezisBlurView">
                         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={fecharModal} />
                     </BlurView>
                     <Animated.View style={[styles.modalCard, { transform: [{ translateY: slideAnim }] }]}>
@@ -598,7 +598,7 @@ export default function Sintomas() {
             </Modal>
 
             <Modal visible={modalExcluir} transparent animationType="fade" onRequestClose={() => setModalExcluir(false)}>
-                <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} experimentalBlurMethod="dimezisBlurView" />
+                <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFillObject} experimentalBlurMethod="dimezisBlurView" />
                 <View style={[styles.modalExcluirFundo, { backgroundColor: 'transparent' }]}>
                     <View style={styles.modalExcluirCard}>
                         <View style={styles.modalExcluirIcone}>

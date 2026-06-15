@@ -3,9 +3,10 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { router, useFocusEffect } from 'expo-router'
 import { useCallback, useState } from 'react'
 import {
-    Dimensions, Image, Platform,
-    StatusBar, StyleSheet, Text,
-    TouchableOpacity, View, ScrollView
+  Dimensions, Image, Platform,
+  ScrollView,
+  StyleSheet, Text,
+  TouchableOpacity, View
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '../../src/lib/supabase'
@@ -14,9 +15,9 @@ const { width } = Dimensions.get('window')
 
 const OPCOES = [
   { label: 'Medicamento', descricao: 'Agende medicamentos e controle doses diárias', icone: 'activity', rota: '/modulos/medicamentos?action=create&hideList=true', colors: ['#EBE3FF', '#DCCEFF'], iconColor: '#6B49AD', shadow: 'rgba(107, 73, 173, 0.15)' },
-  { label: 'Consulta',    descricao: 'Organize consultas médicas e acompanhamentos',      icone: 'calendar', rota: '/modulos/consultas?action=create&hideList=true',    colors: ['#E0EDFF', '#C4DDFF'], iconColor: '#2563EB', shadow: 'rgba(37, 99, 235, 0.15)' },
-  { label: 'Sintoma',     descricao: 'Registre a intensidade da dor e gatilhos', icone: 'thermometer', rota: '/modulos/sintomas?action=create&hideList=true',  colors: ['#FFE4E6', '#FECDD3'], iconColor: '#E11D48', shadow: 'rgba(225, 29, 72, 0.15)' },
-  { label: 'Exame',       descricao: 'Marque exames e faça o upload de resultados',       icone: 'file-text', rota: '/modulos/exames?action=create&hideList=true',      colors: ['#E6FDF4', '#C6F6E5'], iconColor: '#059669', shadow: 'rgba(5, 150, 105, 0.15)' },
+  { label: 'Consulta', descricao: 'Organize consultas médicas e acompanhamentos', icone: 'calendar', rota: '/modulos/consultas?action=create&hideList=true', colors: ['#E0EDFF', '#C4DDFF'], iconColor: '#2563EB', shadow: 'rgba(37, 99, 235, 0.15)' },
+  { label: 'Sintoma', descricao: 'Registre a intensidade da dor e gatilhos', icone: 'thermometer', rota: '/modulos/sintomas?action=create&hideList=true', colors: ['#FFE4E6', '#FECDD3'], iconColor: '#E11D48', shadow: 'rgba(225, 29, 72, 0.15)' },
+  { label: 'Exame', descricao: 'Marque exames e faça o upload de resultados', icone: 'file-text', rota: '/modulos/exames?action=create&hideList=true', colors: ['#E6FDF4', '#C6F6E5'], iconColor: '#059669', shadow: 'rgba(5, 150, 105, 0.15)' },
 ]
 
 export default function Criar() {
@@ -116,15 +117,17 @@ export default function Criar() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#F8F6FC',
+    backgroundColor: '#F5F0FF',
   },
   scrollContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingTop: 0,
     paddingBottom: 120,
   },
+
   cardPerfil: {
     backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginTop: 16,
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -133,15 +136,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     shadowColor: '#6B49AD',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 4,
-    marginBottom: 28,
-    borderWidth: 1,
-    borderColor: '#F0EAFF',
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
     ...Platform.select({
       web: {
-        boxShadow: '0px 4px 16px rgba(107, 73, 173, 0.08)'
+        boxShadow: '0px 4px 12px rgba(107, 73, 173, 0.1)'
       }
     })
   },
@@ -153,8 +153,9 @@ const styles = StyleSheet.create({
   logo: { width: 110, height: 36 },
 
   tituloSecao: {
+    marginHorizontal: 16,
+    marginTop: 12,
     marginBottom: 24,
-    paddingHorizontal: 4,
   },
   titulo: {
     fontSize: 28,
@@ -171,9 +172,10 @@ const styles = StyleSheet.create({
 
   listaVertical: {
     gap: 16,
+    marginHorizontal: 16,
   },
   itemCard: {
-    flexDirection: 'row',
+    flexDirection: 'row', // ← era 'row-reverse', corrigido para 'row'
     alignItems: 'center',
     backgroundColor: '#ffffff',
     borderRadius: 24,

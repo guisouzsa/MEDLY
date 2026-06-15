@@ -4,7 +4,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useCallback, useEffect, useState } from 'react'
 import {
   Image,
-  Platform, ScrollView, StatusBar, StyleSheet,
+  ScrollView, StyleSheet,
   Text, TouchableOpacity, View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -23,7 +23,6 @@ function getDiasDoMes(ano: number, mes: number) {
   return celulas
 }
 
-// ─── Agrupa as células em semanas de 7 dias ───────────────────────────────────
 function getSemanas(dias: (number | null)[]): (number | null)[][] {
   const semanas: (number | null)[][] = []
   for (let i = 0; i < dias.length; i += 7) {
@@ -267,14 +266,12 @@ export default function TelaCalendario() {
               <Image source={{ uri: perfilFoto }} style={styles.fotoPerfil} onError={() => setPerfilFoto(null)} />
             ) : (
               <View style={styles.fotoPerfilPlaceholder}>
-                <Feather name="user" size={20} color="#9163CB" />
+                <Feather name="user" size={24} color="#9163CB" />
               </View>
             )}
           </TouchableOpacity>
           <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
-          <TouchableOpacity onPress={() => router.push('/(tabs)' as any)} style={styles.voltarBtn}>
-            <Feather name="arrow-left" size={16} color="#6B49AD" />
-          </TouchableOpacity>
+          <View style={{ width: 44 }} />
         </View>
 
         {/* Título */}
@@ -288,8 +285,6 @@ export default function TelaCalendario() {
 
         {/* Calendário */}
         <View style={styles.calendarioCard}>
-
-          {/* Nav */}
           <View style={styles.calendarioNav}>
             <TouchableOpacity onPress={anterior} style={styles.navBtn}>
               <Feather name="chevron-left" size={20} color="#6B49AD" />
@@ -307,14 +302,12 @@ export default function TelaCalendario() {
             </TouchableOpacity>
           </View>
 
-          {/* Dias da semana */}
           <View style={styles.semanaRow}>
             {DIAS_SEMANA.map(d => (
               <Text key={d} style={styles.semanaTexto}>{d}</Text>
             ))}
           </View>
 
-          {/* ── GRADE CORRIGIDA: uma View por semana, cada célula com flex:1 ── */}
           <View style={styles.grade}>
             {semanas.map((semana, si) => (
               <View key={si} style={styles.semanaLinha}>
@@ -356,7 +349,6 @@ export default function TelaCalendario() {
             ))}
           </View>
 
-          {/* Legenda */}
           <View style={styles.legendaDivisor} />
           <View style={styles.legendaRow}>
             <View style={styles.legendaItem}>
@@ -442,26 +434,24 @@ export default function TelaCalendario() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1, backgroundColor: '#F5F0FF',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    // ← removido: paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0
   },
-  scroll: { paddingHorizontal: 16, paddingTop: 12 },
+  scroll: { paddingHorizontal: 16, paddingTop: 0 }, // ← era 12, agora 0
 
   cardPerfil: {
-    backgroundColor: '#fff', borderRadius: 60, paddingHorizontal: 12, paddingVertical: 8,
+    backgroundColor: '#fff', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10,
     flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between',
     shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1, shadowRadius: 12, elevation: 6, marginBottom: 12,
+    shadowOpacity: 0.1, shadowRadius: 12, elevation: 5,
+    marginTop: 16, // ← era marginBottom: 12 apenas, agora tem marginTop: 16
+    marginBottom: 12,
   },
   fotoPerfil: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#E2D9F3' },
   fotoPerfilPlaceholder: {
     width: 44, height: 44, borderRadius: 22, backgroundColor: '#EDE8FA',
     justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#E2D9F3',
   },
-  logo: { width: 100, height: 36 },
-  voltarBtn: {
-    width: 36, height: 36, borderRadius: 18, backgroundColor: '#F0EAFF',
-    justifyContent: 'center', alignItems: 'center',
-  },
+  logo: { width: 110, height: 36 },
 
   cardTituloLista: {
     borderRadius: 50, paddingVertical: 14, alignItems: 'center',
@@ -488,12 +478,9 @@ const styles = StyleSheet.create({
   semanaRow: { flexDirection: 'row', marginBottom: 8 },
   semanaTexto: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '700', color: '#9163CB' },
 
-  // ── CORREÇÃO: grade sem flexWrap, semanaLinha com flex row ──────────────────
   grade: { flexDirection: 'column' },
   semanaLinha: { flexDirection: 'row', marginBottom: 4 },
-  // diaCell com flex:1 garante exatamente 1/7 da largura sem arredondamento
   diaCell: { flex: 1, alignItems: 'center' },
-  // ────────────────────────────────────────────────────────────────────────────
 
   diaBotao: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   diaHoje: { borderWidth: 1.5, borderColor: '#6B49AD' },
