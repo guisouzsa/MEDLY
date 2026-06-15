@@ -528,18 +528,6 @@ Ao clicar em uma data:
 
 ---
 
-## Criar pelo Calendário
-
-Ao selecionar uma data:
-
-```text
-Adicionar Evento
-```
-
-O sistema já preenche automaticamente a data selecionada.
-
----
-
 # Pesquisa Global
 
 Sistema de busca centralizado.
