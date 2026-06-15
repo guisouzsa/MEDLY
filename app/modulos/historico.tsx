@@ -228,9 +228,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1, shadowRadius: 12, elevation: 5,
     marginBottom: 14,
   },
-  fotoPerfil: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#E2D9F3' },
+  fotoPerfil: { width: 38, height: 38, borderRadius: 19, borderWidth: 2, borderColor: '#E2D9F3' },
   fotoPerfilPlaceholder: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: '#EDE8FA',
+    width: 38, height: 38, borderRadius: 19, backgroundColor: '#EDE8FA',
     justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#E2D9F3',
   },
   logo: { width: 110, height: 36 },

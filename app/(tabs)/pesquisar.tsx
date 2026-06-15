@@ -832,19 +832,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F0FF',
   },
   scroll: {
-    paddingTop: 0,
-    paddingBottom: 20,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 32,
   },
 
   // ── Header — padrão dos módulos ───────────────────────────────────────────
   cardPerfil: {
     backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 14,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    borderRadius: 60,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -852,31 +850,31 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
-    elevation: 5,
+    elevation: 6,
+    marginBottom: 14,
   },
-  fotoPerfil: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#E2D9F3' },
+  fotoPerfil: { width: 38, height: 38, borderRadius: 19, borderWidth: 2, borderColor: '#E2D9F3' },
   fotoPerfilPlaceholder: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: '#EDE8FA',
+    width: 38, height: 38, borderRadius: 19, backgroundColor: '#EDE8FA',
     justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#E2D9F3',
   },
   logo: { width: 110, height: 36 },
 
-  headerTitleBox: { marginBottom: 16, paddingHorizontal: 20 },
+  headerTitleBox: { marginBottom: 24, paddingHorizontal: 4 },
   headerTitleText: { fontSize: 26, fontWeight: '800', color: '#301971', marginBottom: 4 },
   headerSubText: { fontSize: 15, color: '#9163CB', fontWeight: '600' },
 
   // Input
   inputBox: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: '#fff', borderRadius: 999,
-    paddingHorizontal: 18, paddingVertical: 11,
-    borderWidth: 1.5, borderColor: '#EBE5F9',
+    backgroundColor: '#fff', borderRadius: 24,
+    paddingHorizontal: 20, paddingVertical: 4,
+    borderWidth: 1, borderColor: '#EBE5F9',
     marginBottom: 12,
-    marginHorizontal: 16,
-    shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 4 },
+    shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.06, shadowRadius: 10, elevation: 3,
   },
-  input: { flex: 1, fontSize: 15, color: '#301971', fontWeight: '600' },
+  input: { flex: 1, fontSize: 15, color: '#301971', fontWeight: '500' },
   clearBtn: { backgroundColor: '#C4B5FD', padding: 4, borderRadius: 10 },
 
   // Botão filtro
@@ -884,14 +882,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start',
     backgroundColor: '#51309A', borderRadius: 999,
     paddingHorizontal: 16, paddingVertical: 9, marginBottom: 20, gap: 6,
-    marginHorizontal: 16,
     shadowColor: '#51309A', shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15, shadowRadius: 6, elevation: 3,
   },
   botaoFiltroTexto: { fontSize: 13, fontWeight: '700', color: '#fff' },
 
   // Lista
-  lista: { gap: 12, marginHorizontal: 16 },
+  lista: { gap: 12},
   vazioContainer: { alignItems: 'center', marginTop: 40, gap: 12 },
   vazioIcone: {
     width: 76, height: 76, borderRadius: 24, backgroundColor: '#EDE8FA',

@@ -13,11 +13,12 @@ import { supabase } from '../../src/lib/supabase'
 
 const { width } = Dimensions.get('window')
 
+// Ponto 2: label e descrição do primeiro item vêm da Versão 1 ('Remédios')
 const OPCOES = [
-  { label: 'Medicamento', descricao: 'Agende medicamentos e controle doses diárias', icone: 'activity', rota: '/modulos/medicamentos?action=create&hideList=true', colors: ['#EBE3FF', '#DCCEFF'], iconColor: '#6B49AD', shadow: 'rgba(107, 73, 173, 0.15)' },
-  { label: 'Consulta', descricao: 'Organize consultas médicas e acompanhamentos', icone: 'calendar', rota: '/modulos/consultas?action=create&hideList=true', colors: ['#E0EDFF', '#C4DDFF'], iconColor: '#2563EB', shadow: 'rgba(37, 99, 235, 0.15)' },
-  { label: 'Sintoma', descricao: 'Registre a intensidade da dor e gatilhos', icone: 'thermometer', rota: '/modulos/sintomas?action=create&hideList=true', colors: ['#FFE4E6', '#FECDD3'], iconColor: '#E11D48', shadow: 'rgba(225, 29, 72, 0.15)' },
-  { label: 'Exame', descricao: 'Marque exames e faça o upload de resultados', icone: 'file-text', rota: '/modulos/exames?action=create&hideList=true', colors: ['#E6FDF4', '#C6F6E5'], iconColor: '#059669', shadow: 'rgba(5, 150, 105, 0.15)' },
+  { label: 'Remédios', descricao: 'Cadastre remédios e controle doses diárias', icone: 'activity', rota: '/modulos/medicamentos?action=create&hideList=true', colors: ['#EBE3FF', '#DCCEFF'], iconColor: '#6B49AD', shadow: 'rgba(107, 73, 173, 0.15)' },
+  { label: 'Consulta',    descricao: 'Organize consultas médicas e acompanhamentos',      icone: 'calendar', rota: '/modulos/consultas?action=create&hideList=true',    colors: ['#E0EDFF', '#C4DDFF'], iconColor: '#2563EB', shadow: 'rgba(37, 99, 235, 0.15)' },
+  { label: 'Sintoma',     descricao: 'Registre a intensidade da dor e gatilhos', icone: 'thermometer', rota: '/modulos/sintomas?action=create&hideList=true',  colors: ['#FFE4E6', '#FECDD3'], iconColor: '#E11D48', shadow: 'rgba(225, 29, 72, 0.15)' },
+  { label: 'Exame',       descricao: 'Marque exames e faça o upload de resultados',       icone: 'file-text', rota: '/modulos/exames?action=create&hideList=true',      colors: ['#E6FDF4', '#C6F6E5'], iconColor: '#059669', shadow: 'rgba(5, 150, 105, 0.15)' },
 ]
 
 export default function Criar() {
@@ -56,6 +57,8 @@ export default function Criar() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      {/* Ponto 1: ScrollView — mantida a Versão 2 (import organizado junto aos demais).
+          Funcionalmente idênticas; a V2 apenas agrupa ScrollView na mesma linha dos outros imports. */}
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContainer}>
         {/* Card 1 — Perfil + Logo */}
         <View style={styles.cardPerfil}>
@@ -78,13 +81,14 @@ export default function Criar() {
           <Text style={styles.subtitulo}>Selecione uma categoria para adicionar</Text>
         </View>
 
-        {/* Lista Vertical Premium */}
+        {/* Lista Vertical */}
         <View style={styles.listaVertical}>
           {OPCOES.map((op) => (
             <TouchableOpacity
               key={op.label}
               style={[
                 styles.itemCard,
+                // Ponto 7: borda lateral colorida da V2 + sombra leve da V1
                 { borderLeftWidth: 6, borderLeftColor: op.iconColor },
                 Platform.OS === 'web' && { boxShadow: `0px 10px 25px ${op.shadow}` } as any
               ]}
@@ -103,6 +107,7 @@ export default function Criar() {
                 <Text style={styles.cardLabel}>{op.label}</Text>
                 <Text style={styles.cardDesc}>{op.descricao}</Text>
               </View>
+              {/* Chevron da V2 — cor de fundo e ícone dinâmicos por categoria */}
               <View style={[styles.chevronWrapper, { backgroundColor: op.colors[0] }]}>
                 <Feather name="chevron-right" size={20} color={op.iconColor} />
               </View>
@@ -120,17 +125,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F0FF',
   },
   scrollContainer: {
-    paddingTop: 0,
+    paddingHorizontal: 16,
+    paddingTop: 12,
     paddingBottom: 120,
   },
 
+  // Ponto 3: cardPerfil da V1 (borderRadius: 60, sem marginHorizontal extra).
+  // V2 usava borderRadius: 999 (pill total), marginHorizontal: 16, marginTop: 16
+  // e Platform.select para sombra web — visual mais "flutuante" e separado das bordas.
   cardPerfil: {
     backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    borderRadius: 60,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -138,55 +145,54 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
-    elevation: 5,
-    ...Platform.select({
-      web: {
-        boxShadow: '0px 4px 12px rgba(107, 73, 173, 0.1)'
-      }
-    })
+    elevation: 6,
+    marginBottom: 14,
   },
-  fotoPerfil: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#E2D9F3' },
+
+  // Ponto 4: foto de perfil da V1 (38x38)
+  fotoPerfil: { width: 38, height: 38, borderRadius: 19, borderWidth: 2, borderColor: '#E2D9F3' },
   fotoPerfilPlaceholder: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: '#EDE8FA',
+    width: 38, height: 38, borderRadius: 19, backgroundColor: '#EDE8FA',
     justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#E2D9F3',
   },
   logo: { width: 110, height: 36 },
 
+  // Ponto 5: tituloSecao da V1 (paddingHorizontal: 4, cor #301971, subtitulo #9163CB)
   tituloSecao: {
-    marginHorizontal: 16,
-    marginTop: 12,
     marginBottom: 24,
+    paddingHorizontal: 4,
   },
   titulo: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#1C0D3F',
+    color: '#301971',
     marginBottom: 6,
     letterSpacing: -0.5,
   },
   subtitulo: {
     fontSize: 15,
-    color: '#866FA8',
+    color: '#9163CB',
     fontWeight: '500',
   },
 
   listaVertical: {
     gap: 16,
-    marginHorizontal: 16,
   },
+
+  // Ponto 7: borderLeft da V2 + shadow fraca da V1
   itemCard: {
-    flexDirection: 'row', // ← era 'row-reverse', corrigido para 'row'
+    flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ffffff',
     borderRadius: 24,
     padding: 16,
     borderWidth: 1,
     borderColor: '#F1EEF8',
-    shadowColor: '#6B49AD',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    elevation: 5,
+    shadowColor: '#481D94',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
   },
   cardIconeWrapper: {
     width: 58,
@@ -212,11 +218,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     lineHeight: 18,
   },
+
+  // Chevron da V2 — backgroundColor e cor do ícone são dinâmicos (aplicados inline)
   chevronWrapper: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#F6F3FB',
     justifyContent: 'center',
     alignItems: 'center',
   },

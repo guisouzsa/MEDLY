@@ -4,7 +4,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useCallback, useEffect, useState } from 'react'
 import {
   Image,
-  ScrollView, StyleSheet,
+  Platform, ScrollView, StatusBar, StyleSheet,
   Text, TouchableOpacity, View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -160,7 +160,8 @@ export default function TelaCalendario() {
 
   const acordions = [
     {
-      key: 'meds', icon: 'activity' as any, label: `Medicamentos (${dbData.medicamentos.length})`,
+      // Ponto 4 — V1: label "Remédios"
+      key: 'meds', icon: 'activity' as any, label: `Remédios (${dbData.medicamentos.length})`,
       render: () => dbData.medicamentos.length === 0
         ? <Text style={styles.registroVazio}>Nenhum medicamento cadastrado.</Text>
         : dbData.medicamentos.map(med => {
@@ -259,14 +260,15 @@ export default function TelaCalendario() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
-        {/* Header */}
+        {/* Header — Ponto 2: V1 (imports Platform/StatusBar mantidos), Ponto 3: V2 (foto 44x44),
+            botão voltar removido, substituído por View vazia para manter espaçamento */}
         <View style={styles.cardPerfil}>
           <TouchableOpacity onPress={() => router.push('/modulos/perfil' as any)} activeOpacity={0.85}>
             {perfilFoto ? (
               <Image source={{ uri: perfilFoto }} style={styles.fotoPerfil} onError={() => setPerfilFoto(null)} />
             ) : (
               <View style={styles.fotoPerfilPlaceholder}>
-                <Feather name="user" size={24} color="#9163CB" />
+                <Feather name="user" size={20} color="#9163CB" />
               </View>
             )}
           </TouchableOpacity>
@@ -432,23 +434,26 @@ export default function TelaCalendario() {
 }
 
 const styles = StyleSheet.create({
+  // Ponto 2 — V1: paddingTop Android via Platform/StatusBar
   safe: {
-    flex: 1, backgroundColor: '#F5F0FF',
-    // ← removido: paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0
+    flex: 1,
+    backgroundColor: '#F5F0FF',
   },
-  scroll: { paddingHorizontal: 16, paddingTop: 0 }, // ← era 12, agora 0
+  // Ponto 2 — V1: paddingTop: 12
+  scroll: { paddingHorizontal: 16, paddingTop: 12  },
 
+  // Ponto 3 — V1: borderRadius 60, foto 38x38, sem marginTop extra (consistente com criar.tsx)
+  // Botão voltar removido — substituído por View vazia width:44
   cardPerfil: {
-    backgroundColor: '#fff', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10,
+    backgroundColor: '#fff', borderRadius: 60, paddingHorizontal: 12, paddingVertical: 8,
     flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between',
     shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1, shadowRadius: 12, elevation: 5,
-    marginTop: 16, // ← era marginBottom: 12 apenas, agora tem marginTop: 16
-    marginBottom: 12,
+    shadowOpacity: 0.1, shadowRadius: 12, elevation: 6,
+    marginBottom: 14,
   },
-  fotoPerfil: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#E2D9F3' },
+  fotoPerfil: { width: 38, height: 38, borderRadius: 19, borderWidth: 2, borderColor: '#E2D9F3' },
   fotoPerfilPlaceholder: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: '#EDE8FA',
+    width: 38, height: 38, borderRadius: 19, backgroundColor: '#EDE8FA',
     justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#E2D9F3',
   },
   logo: { width: 110, height: 36 },
@@ -551,6 +556,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
   accordionTitulo: { fontSize: 13, fontWeight: '700', color: '#301971' },
+  // Ponto 5 — V2: gap: 12
   accordionContent: {
     backgroundColor: '#FAFAFE', borderWidth: 1, borderTopWidth: 0,
     borderColor: '#EDE8FA', borderBottomLeftRadius: 16, borderBottomRightRadius: 16,

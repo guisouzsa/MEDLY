@@ -5,26 +5,20 @@ import { supabase } from './supabase'
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
 const CANAL_LEMBRETES = 'lembretes-medly-v2'
-const DIAS_AGENDAMENTO = 7 // Agenda apenas 7 dias à frente (evita limite de 500)
+const DIAS_AGENDAMENTO = 7
 
-// Categorias de ação por tipo
 const CATEGORIA_MEDICAMENTO = 'medicamento'
 const CATEGORIA_CONSULTA = 'consulta'
 const CATEGORIA_EXAME = 'exame'
 
 // ─── Inicialização ───────────────────────────────────────────────────────────
 
-/**
- * Configura o handler de notificações (como exibir quando o app está aberto),
- * cria o canal Android obrigatório e registra as categorias com botões de ação.
- */
 export async function inicializarNotificacoes() {
   if (Platform.OS === 'web') {
     console.log('Notificações nativas ignoradas no ambiente Web.')
     return
   }
 
-  // Handler: como exibir notificações quando o app está em primeiro plano
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowBanner: true,
@@ -34,7 +28,6 @@ export async function inicializarNotificacoes() {
     }),
   })
 
-  // Canal Android (obrigatório no Android 8+)
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync(CANAL_LEMBRETES, {
       name: 'Lembretes MEDLY',
@@ -48,64 +41,32 @@ export async function inicializarNotificacoes() {
     })
   }
 
-  // Registrar categorias com botões de ação personalizados
   await Notifications.setNotificationCategoryAsync(CATEGORIA_MEDICAMENTO, [
-    {
-      identifier: 'tomei',
-      buttonTitle: 'Tomei',
-      options: { opensAppToForeground: false },
-    },
-    {
-      identifier: 'abrir',
-      buttonTitle: 'Abrir App',
-      options: { opensAppToForeground: true },
-    },
+    { identifier: 'tomei', buttonTitle: 'Tomei', options: { opensAppToForeground: false } },
+    { identifier: 'abrir', buttonTitle: 'Abrir App', options: { opensAppToForeground: true } },
   ])
 
   await Notifications.setNotificationCategoryAsync(CATEGORIA_CONSULTA, [
-    {
-      identifier: 'feita',
-      buttonTitle: 'Feita',
-      options: { opensAppToForeground: false },
-    },
-    {
-      identifier: 'abrir',
-      buttonTitle: 'Abrir App',
-      options: { opensAppToForeground: true },
-    },
+    { identifier: 'feita', buttonTitle: 'Feita', options: { opensAppToForeground: false } },
+    { identifier: 'abrir', buttonTitle: 'Abrir App', options: { opensAppToForeground: true } },
   ])
 
   await Notifications.setNotificationCategoryAsync(CATEGORIA_EXAME, [
-    {
-      identifier: 'feito',
-      buttonTitle: 'Feito',
-      options: { opensAppToForeground: false },
-    },
-    {
-      identifier: 'abrir',
-      buttonTitle: 'Abrir App',
-      options: { opensAppToForeground: true },
-    },
+    { identifier: 'feito', buttonTitle: 'Feito', options: { opensAppToForeground: false } },
+    { identifier: 'abrir', buttonTitle: 'Abrir App', options: { opensAppToForeground: true } },
   ])
 }
 
 // ─── Permissão ───────────────────────────────────────────────────────────────
 
-/**
- * Pede permissão para enviar notificações. Retorna true se concedido.
- */
 export async function pedirPermissaoNotificacoes(): Promise<boolean> {
   if (Platform.OS === 'web') return false
   const { status: existente } = await Notifications.getPermissionsAsync()
   if (existente === 'granted') return true
-
   const { status } = await Notifications.requestPermissionsAsync()
   return status === 'granted'
 }
 
-/**
- * Verifica se a permissão já foi concedida (sem pedir).
- */
 export async function verificarPermissao(): Promise<boolean> {
   if (Platform.OS === 'web') return false
   const { status } = await Notifications.getPermissionsAsync()
@@ -114,18 +75,11 @@ export async function verificarPermissao(): Promise<boolean> {
 
 // ─── Cancelamento ────────────────────────────────────────────────────────────
 
-/**
- * Cancela todas as notificações agendadas.
- */
 export async function cancelarTodasNotificacoes() {
   if (Platform.OS === 'web') return
   await Notifications.cancelAllScheduledNotificationsAsync()
 }
 
-/**
- * Cancela notificações de um registro específico (por prefixo de ID).
- * Ex: cancelarNotificacoesPorPrefixo('med-42') cancela med-42-08:00, med-42-14:00, etc.
- */
 export async function cancelarNotificacoesPorPrefixo(prefixo: string) {
   if (Platform.OS === 'web') return
   const agendadas = await Notifications.getAllScheduledNotificationsAsync()
@@ -156,10 +110,7 @@ type MedicamentoParaNotificar = {
   }[]
 }
 
-/**
- * Agenda notificações para um medicamento nos próximos DIAS_AGENDAMENTO dias.
- * Retorna o número de notificações agendadas.
- */
+// V1: dispara no horário exato do remédio (+ 24h e 1h antes com emojis)
 async function agendarMedicamento(med: MedicamentoParaNotificar): Promise<number> {
   if (med.status !== 'ativo') return 0
 
@@ -172,7 +123,6 @@ async function agendarMedicamento(med: MedicamentoParaNotificar): Promise<number
     dia.setDate(agora.getDate() + diaOffset)
     const diaStr = formatarLocalDate(dia)
 
-    // Verificar se está dentro do período do medicamento
     if (diaStr < med.data_inicio) continue
     if (med.data_termino && diaStr > med.data_termino) continue
 
@@ -183,44 +133,60 @@ async function agendarMedicamento(med: MedicamentoParaNotificar): Promise<number
       const dataNotificacao = new Date(dia)
       dataNotificacao.setHours(h, m, 0, 0)
 
+      // Não agendar se já passou
+      if (dataNotificacao <= agora) continue
+
       const descricao = [med.dosagem, med.quantidade_por_dose].filter(Boolean).join(' · ')
       const identificador = `med-${med.id}-${diaStr}-${horarioStr}`
 
-      const data24h = new Date(dataNotificacao.getTime() - 24 * 60 * 60 * 1000)
-      const data1h = new Date(dataNotificacao.getTime() - 1 * 60 * 60 * 1000)
+      // Notificação no horário exato (V1)
+      await Notifications.scheduleNotificationAsync({
+        identifier: identificador,
+        content: {
+          title: 'Medicação',
+          body: `Tomar ${med.nome}${descricao ? ` (${descricao})` : ''}`,
+          sound: 'default',
+          categoryIdentifier: CATEGORIA_MEDICAMENTO,
+          data: { tipo: 'medicamento', id: med.id },
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: dataNotificacao,
+        },
+      })
+      count++
 
-      if (data24h > agora) {
+      // 24h antes — com verificação <= limite (V2)
+      const data24h = new Date(dataNotificacao.getTime() - 24 * 60 * 60 * 1000)
+      const limite = new Date(); limite.setDate(agora.getDate() + DIAS_AGENDAMENTO)
+      if (data24h > agora && data24h <= limite) {
         await Notifications.scheduleNotificationAsync({
           identifier: `${identificador}-24h`,
           content: {
-            title: 'Medicação em 24h',
+            title: '⏰ Medicação amanhã',
             body: `Tomar ${med.nome}${descricao ? ` (${descricao})` : ''} amanhã às ${horarioStr}`,
             sound: 'default',
             categoryIdentifier: CATEGORIA_MEDICAMENTO,
             data: { tipo: 'medicamento', id: med.id },
           },
-          trigger: {
-            type: Notifications.SchedulableTriggerInputTypes.DATE,
-            date: data24h,
-          },
+          trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: data24h },
         })
         count++
       }
 
-      if (data1h > agora) {
+      // 1h antes — com verificação <= limite (V2)
+      const data1h = new Date(dataNotificacao.getTime() - 60 * 60 * 1000)
+      if (data1h > agora && data1h <= limite) {
         await Notifications.scheduleNotificationAsync({
           identifier: `${identificador}-1h`,
           content: {
-            title: 'Medicação em 1h',
+            title: '🔔 Medicação em 1 hora',
             body: `Tomar ${med.nome}${descricao ? ` (${descricao})` : ''} em 1h às ${horarioStr}`,
             sound: 'default',
             categoryIdentifier: CATEGORIA_MEDICAMENTO,
             data: { tipo: 'medicamento', id: med.id },
           },
-          trigger: {
-            type: Notifications.SchedulableTriggerInputTypes.DATE,
-            date: data1h,
-          },
+          trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: data1h },
         })
         count++
       }
@@ -230,9 +196,6 @@ async function agendarMedicamento(med: MedicamentoParaNotificar): Promise<number
   return count
 }
 
-/**
- * Retorna os horários que um medicamento deve tocar num dia específico.
- */
 function obterHorariosParaDia(
   med: MedicamentoParaNotificar,
   dia: Date,
@@ -244,16 +207,12 @@ function obterHorariosParaDia(
 
   if (med.frequencia_tipo === 'semanal') {
     const weekday = dia.getDay()
-    return horarios
-      .filter(h => h.dia_semana === weekday)
-      .map(h => h.horario.slice(0, 5))
+    return horarios.filter(h => h.dia_semana === weekday).map(h => h.horario.slice(0, 5))
   }
 
   if (med.frequencia_tipo === 'mensal') {
     const dayOfMonth = dia.getDate()
-    return horarios
-      .filter(h => h.dia_mes === dayOfMonth)
-      .map(h => h.horario.slice(0, 5))
+    return horarios.filter(h => h.dia_mes === dayOfMonth).map(h => h.horario.slice(0, 5))
   }
 
   if (med.frequencia_tipo === 'personalizado' && med.intervalo_horas) {
@@ -261,22 +220,21 @@ function obterHorariosParaDia(
     const [sh, sm] = startHourStr.split(':').map(Number)
     const H = med.intervalo_horas
     const resultado: string[] = []
-    
+
     const [startYear, startMonth, startDay] = med.data_inicio.split('-').map(Number)
     const start = new Date(startYear, startMonth - 1, startDay, sh, sm, 0)
-    
+
     const dayStart = new Date(dia.getFullYear(), dia.getMonth(), dia.getDate(), 0, 0, 0)
     const dayEnd = new Date(dia.getFullYear(), dia.getMonth(), dia.getDate(), 23, 59, 59)
-    
+
     if (dayEnd >= start) {
       const msDiff = dayStart.getTime() - start.getTime()
       const hoursDiff = msDiff / (1000 * 60 * 60)
       let k = Math.max(0, Math.ceil(hoursDiff / H))
-      
+
       while (true) {
         const occurrenceTime = new Date(start.getTime() + k * H * 1000 * 60 * 60)
         if (occurrenceTime > dayEnd) break
-        
         const hour = occurrenceTime.getHours()
         const min = occurrenceTime.getMinutes()
         resultado.push(`${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}`)
@@ -299,9 +257,7 @@ type ConsultaParaNotificar = {
   horario: string | null
 }
 
-/**
- * Agenda notificação para uma consulta no horário exato.
- */
+// V1: notificação no horário exato + 24h + 1h antes com emojis + verificação <= limite (V2)
 async function agendarConsulta(consulta: ConsultaParaNotificar): Promise<number> {
   const agora = new Date()
   let count = 0
@@ -312,49 +268,57 @@ async function agendarConsulta(consulta: ConsultaParaNotificar): Promise<number>
   const [h, m] = consulta.horario.slice(0, 5).split(':').map(Number)
   const dataNotificacao = new Date(ano, mes - 1, dia, h, m, 0)
 
+  if (dataNotificacao <= agora) return 0
   const limite = new Date()
   limite.setDate(agora.getDate() + DIAS_AGENDAMENTO)
+  if (dataNotificacao > limite) return 0
 
   const identificador = `con-${consulta.id}`
-  const horarioStr = consulta.horario.slice(0, 5)
 
+  // Notificação no horário exato (V1)
+  await Notifications.scheduleNotificationAsync({
+    identifier: identificador,
+    content: {
+      title: 'Consulta',
+      body: `${consulta.especialidade} com Dr(a). ${consulta.nome_medico} às ${consulta.horario.slice(0, 5)}`,
+      sound: 'default',
+      categoryIdentifier: CATEGORIA_CONSULTA,
+      data: { tipo: 'consulta', id: consulta.id },
+    },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: dataNotificacao },
+  })
+  count++
+
+  // 24h antes com emoji + verificação <= limite (V2)
   const data24h = new Date(dataNotificacao.getTime() - 24 * 60 * 60 * 1000)
-  const data1h = new Date(dataNotificacao.getTime() - 1 * 60 * 60 * 1000)
-
   if (data24h > agora && data24h <= limite) {
     await Notifications.scheduleNotificationAsync({
-      identifier: `${identificador}-24h`,
+      identifier: `con-${consulta.id}-24h`,
       content: {
-        title: 'Consulta amanhã',
-        body: `${consulta.especialidade} com Dr(a). ${consulta.nome_medico} amanhã às ${horarioStr}`,
+        title: '⏰ Consulta amanhã',
+        body: `${consulta.especialidade} com Dr(a). ${consulta.nome_medico} às ${consulta.horario!.slice(0, 5)}`,
         sound: 'default',
         categoryIdentifier: CATEGORIA_CONSULTA,
         data: { tipo: 'consulta', id: consulta.id },
       },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: data24h,
-      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: data24h },
     })
-    count++
   }
 
+  // 1h antes com emoji + verificação <= limite (V2)
+  const data1h = new Date(dataNotificacao.getTime() - 60 * 60 * 1000)
   if (data1h > agora && data1h <= limite) {
     await Notifications.scheduleNotificationAsync({
-      identifier: `${identificador}-1h`,
+      identifier: `con-${consulta.id}-1h`,
       content: {
-        title: 'Consulta em 1h',
-        body: `${consulta.especialidade} com Dr(a). ${consulta.nome_medico} em 1h às ${horarioStr}`,
+        title: '🔔 Consulta em 1 hora',
+        body: `${consulta.especialidade} com Dr(a). ${consulta.nome_medico} às ${consulta.horario!.slice(0, 5)}`,
         sound: 'default',
         categoryIdentifier: CATEGORIA_CONSULTA,
         data: { tipo: 'consulta', id: consulta.id },
       },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: data1h,
-      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: data1h },
     })
-    count++
   }
 
   return count
@@ -370,9 +334,7 @@ type ExameParaNotificar = {
   local: string | null
 }
 
-/**
- * Agenda notificação para um exame no horário exato.
- */
+// V1: notificação no horário exato + 24h + 1h antes com emojis + verificação <= limite (V2)
 async function agendarExame(exame: ExameParaNotificar): Promise<number> {
   const agora = new Date()
   let count = 0
@@ -384,49 +346,58 @@ async function agendarExame(exame: ExameParaNotificar): Promise<number> {
   const [h, m] = horarioStr.split(':').map(Number)
   const dataNotificacao = new Date(ano, mes - 1, dia, h, m, 0)
 
+  if (dataNotificacao <= agora) return 0
   const limite = new Date()
   limite.setDate(agora.getDate() + DIAS_AGENDAMENTO)
+  if (dataNotificacao > limite) return 0
 
   const identificador = `exa-${exame.id}`
   const localTexto = exame.local ? ` em ${exame.local}` : ''
 
-  const data24h = new Date(dataNotificacao.getTime() - 24 * 60 * 60 * 1000)
-  const data1h = new Date(dataNotificacao.getTime() - 1 * 60 * 60 * 1000)
+  // Notificação no horário exato (V1)
+  await Notifications.scheduleNotificationAsync({
+    identifier: identificador,
+    content: {
+      title: 'Exame',
+      body: `${exame.nome} às ${horarioStr}${localTexto}`,
+      sound: 'default',
+      categoryIdentifier: CATEGORIA_EXAME,
+      data: { tipo: 'exame', id: exame.id },
+    },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: dataNotificacao },
+  })
+  count++
 
+  // 24h antes com emoji + verificação <= limite (V2)
+  const data24h = new Date(dataNotificacao.getTime() - 24 * 60 * 60 * 1000)
   if (data24h > agora && data24h <= limite) {
     await Notifications.scheduleNotificationAsync({
-      identifier: `${identificador}-24h`,
+      identifier: `exa-${exame.id}-24h`,
       content: {
-        title: 'Exame amanhã',
-        body: `${exame.nome} amanhã às ${horarioStr}${localTexto}`,
+        title: '⏰ Exame amanhã',
+        body: `${exame.nome} às ${exame.horario!.slice(0, 5)}`,
         sound: 'default',
         categoryIdentifier: CATEGORIA_EXAME,
         data: { tipo: 'exame', id: exame.id },
       },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: data24h,
-      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: data24h },
     })
-    count++
   }
 
+  // 1h antes com emoji + verificação <= limite (V2)
+  const data1h = new Date(dataNotificacao.getTime() - 60 * 60 * 1000)
   if (data1h > agora && data1h <= limite) {
     await Notifications.scheduleNotificationAsync({
-      identifier: `${identificador}-1h`,
+      identifier: `exa-${exame.id}-1h`,
       content: {
-        title: 'Exame em 1h',
-        body: `${exame.nome} em 1h às ${horarioStr}${localTexto}`,
+        title: '🔔 Exame em 1 hora',
+        body: `${exame.nome} às ${exame.horario!.slice(0, 5)}`,
         sound: 'default',
         categoryIdentifier: CATEGORIA_EXAME,
         data: { tipo: 'exame', id: exame.id },
       },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: data1h,
-      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: data1h },
     })
-    count++
   }
 
   return count
@@ -434,21 +405,15 @@ async function agendarExame(exame: ExameParaNotificar): Promise<number> {
 
 // ─── Reagendamento geral ─────────────────────────────────────────────────────
 
-/**
- * Cancela TODAS as notificações e reagenda os próximos 7 dias.
- * Deve ser chamado: ao abrir o app, ao salvar/excluir qualquer CRUD.
- */
 export async function reagendarTodasNotificacoes(userId: string): Promise<number> {
   try {
     const permitido = await verificarPermissao()
     if (!permitido) return 0
 
-    // Cancela tudo para reconstruir
     await cancelarTodasNotificacoes()
 
     let totalAgendadas = 0
 
-    // ── Medicamentos ativos ────────────────────────────────────────────────
     const { data: meds } = await supabase
       .from('medicamentos')
       .select('id, nome, dosagem, quantidade_por_dose, frequencia_tipo, intervalo_horas, data_inicio, data_termino, status, medicamento_horarios(horario, dia_semana, dia_mes)')
@@ -461,7 +426,6 @@ export async function reagendarTodasNotificacoes(userId: string): Promise<number
       }
     }
 
-    // ── Consultas futuras ──────────────────────────────────────────────────
     const { data: consultas } = await supabase
       .from('consultas')
       .select('id, especialidade, nome_medico, data, horario')
@@ -474,7 +438,6 @@ export async function reagendarTodasNotificacoes(userId: string): Promise<number
       }
     }
 
-    // ── Exames futuros ─────────────────────────────────────────────────────
     const { data: exames } = await supabase
       .from('exames')
       .select('id, nome, data_realizacao, horario, local')

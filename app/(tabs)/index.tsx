@@ -3,14 +3,18 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { router, useFocusEffect } from 'expo-router'
 import { useCallback, useEffect, useState } from 'react'
 import {
-  Image,
-  Platform,
-  ScrollView, StyleSheet, Text,
-  TouchableOpacity, View
+  Image, Modal, Platform,
+  ScrollView, StatusBar, StyleSheet, Text,
+  TouchableOpacity, View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { getEventsForDate, getProximoLembrete } from '../../src/lib/events'
 import { supabase } from '../../src/lib/supabase'
+import {
+  inicializarNotificacoes,
+  pedirPermissaoNotificacoes,
+  reagendarTodasNotificacoes
+} from '../../src/lib/notifications'
 
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
@@ -59,6 +63,7 @@ function Calendario({ data }: { data: any }) {
 
   return (
     <View style={styles.calendarioCard}>
+      {/* Nav */}
       <View style={styles.calendarioNav}>
         <TouchableOpacity onPress={anterior} style={styles.navBtn}>
           <Feather name="chevron-left" size={20} color="#6B49AD" />
@@ -76,12 +81,14 @@ function Calendario({ data }: { data: any }) {
         </TouchableOpacity>
       </View>
 
+      {/* Dias da semana */}
       <View style={styles.semanaRow}>
         {DIAS_SEMANA.map(d => (
           <Text key={d} style={styles.semanaTexto}>{d}</Text>
         ))}
       </View>
 
+      {/* Grade */}
       <View style={styles.grade}>
         {semanas.map((semana, si) => (
           <View key={si} style={styles.semanaLinha}>
@@ -120,6 +127,7 @@ function Calendario({ data }: { data: any }) {
         ))}
       </View>
 
+      {/* Legenda */}
       <View style={styles.legendaDivisor} />
       <View style={styles.legendaRow}>
         <View style={styles.legendaItem}>
@@ -182,6 +190,11 @@ export default function Dashboard() {
           if (userError) throw userError
           if (!user) return
 
+          // Ponto 1 — V1: inicializa e agenda notificações ao abrir o app
+          await inicializarNotificacoes()
+          await pedirPermissaoNotificacoes()
+          await reagendarTodasNotificacoes(user.id)
+
           const { data: perfil, error: perfilError } = await supabase
             .from('perfis').select('foto_url, nome').eq('id', user.id).single()
 
@@ -228,7 +241,8 @@ export default function Dashboard() {
   )
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    // Ponto 4 — V1: sem edges, paddingTop via StatusBar no StyleSheet
+    <SafeAreaView style={styles.safe}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -236,14 +250,14 @@ export default function Dashboard() {
       >
         {/* CARD 1 — header */}
         <View style={styles.card1}>
-          <View style={{ width: 44 }} />
+          <View style={{ width: 48 }} />
           <Image source={require('../../assets/images/logo.png')} style={styles.logoHeader} resizeMode="contain" />
           <TouchableOpacity onPress={() => router.push('/modulos/perfil' as any)} activeOpacity={0.85}>
             {fotoUri ? (
               <Image source={{ uri: fotoUri }} style={styles.fotoPerfil} onError={() => setFotoUri(null)} />
             ) : (
               <View style={styles.fotoPerfilPlaceholder}>
-                <Feather name="user" size={24} color="#9163CB" />
+                <Feather name="user" size={22} color="#6B49AD" />
               </View>
             )}
           </TouchableOpacity>
@@ -304,31 +318,37 @@ export default function Dashboard() {
 }
 
 const styles = StyleSheet.create({
+  // Ponto 4 — V1: paddingTop via StatusBar (sem edges no SafeAreaView)
   safe: {
     flex: 1,
     backgroundColor: '#F5F0FF',
-    // ← removido: paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0
-    // O SafeAreaView com edges={['top']} já cuida disso em todas as plataformas
   },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 16, paddingTop: 0 }, // ← era 12, agora 0
+  // Ponto 4 — V1: paddingTop: 12
+  scrollContent: { paddingHorizontal: 16, paddingTop: 12 },
 
   // ── Header ──────────────────────────────────────────────────────────────────
+  // Ponto 3 — V1: borderRadius 60, foto 38x38, espaçador 48, sem marginTop extra
   card1: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#fff', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10,
-    marginTop: 16, // ← adicionado, igual às outras telas
-    marginBottom: 12,
-    shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5,
-    ...Platform.select({
-      web: { boxShadow: '0px 4px 12px rgba(107, 73, 173, 0.1)' }
-    })
+    backgroundColor: '#fff',
+    borderRadius: 60,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#6B49AD',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
+    marginBottom: 14,
   },
-  fotoPerfil: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#E2D9F3' },
+  // Ponto 3 — V1: 38x38
+  fotoPerfil: { width: 38, height: 38, borderRadius: 19, borderWidth: 2, borderColor: '#E2D9F3' },
   fotoPerfilPlaceholder: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: '#EDE8FA', justifyContent: 'center', alignItems: 'center',
-    borderWidth: 2, borderColor: '#E2D9F3',
+    width: 38, height: 38, borderRadius: 19, backgroundColor: '#EDE8FA',
+    justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#E2D9F3',
   },
   logoHeader: { width: 110, height: 36 },
 
@@ -338,9 +358,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     marginBottom: 12,
     shadowColor: '#301971', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 14, elevation: 10,
-    ...Platform.select({
-      web: { boxShadow: '0px 6px 14px rgba(48, 25, 113, 0.3)' }
-    })
+    ...Platform.select({ web: { boxShadow: '0px 6px 14px rgba(48, 25, 113, 0.3)' } })
   },
   card2Esquerda: { flex: 1 },
   card2Ola: { color: '#D6B9FF', fontSize: 14, fontWeight: '600', marginBottom: 6 },
@@ -351,63 +369,36 @@ const styles = StyleSheet.create({
 
   // ── Lembrete ─────────────────────────────────────────────────────────────────
   card3Fora: {
-    backgroundColor: '#EDE8FA',
-    borderRadius: 26,
-    padding: 6,
-    marginBottom: 12,
+    backgroundColor: '#EDE8FA', borderRadius: 26, padding: 6, marginBottom: 12,
   },
   card3Inner: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    borderRadius: 22,
-    overflow: 'hidden',
-    paddingLeft: 20,
-    minHeight: 130,
+    flexDirection: 'row', alignItems: 'stretch',
+    borderRadius: 22, overflow: 'hidden', paddingLeft: 20, minHeight: 130,
   },
   card3Esquerda: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingVertical: 20,
-    paddingRight: 8,
+    flex: 1, justifyContent: 'center', paddingVertical: 20, paddingRight: 8,
   },
   card3Label: { fontSize: 10, fontWeight: '700', color: '#6B49AD', letterSpacing: 1, marginBottom: 8 },
   card3Tipo: { fontSize: 16, fontWeight: '700', color: '#301971', marginBottom: 4 },
   card3Desc: { fontSize: 13, fontWeight: '600', color: '#301971', lineHeight: 18 },
   card3Img: {
-    width: 130,
-    height: 150,
-    marginBottom: -5,
-    marginRight: -5,
-    alignSelf: 'flex-end',
+    width: 130, height: 150, marginBottom: -5, marginRight: -5, alignSelf: 'flex-end',
   },
 
   // ── Ações rápidas ────────────────────────────────────────────────────────────
   acoesCard: {
     backgroundColor: '#fff', borderRadius: 24, padding: 20, marginBottom: 12,
     shadowColor: '#6B49AD', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 4,
-    ...Platform.select({
-      web: { boxShadow: '0px 4px 12px rgba(107, 73, 173, 0.08)' }
-    })
+    ...Platform.select({ web: { boxShadow: '0px 4px 12px rgba(107, 73, 173, 0.08)' } })
   },
   acoesTitle: { fontSize: 15, fontWeight: '700', color: '#301971', marginBottom: 16 },
-  acoesLinha: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  acaoBotao: {
-    flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: 4,
-  },
+  acoesLinha: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  acaoBotao: { flex: 1, alignItems: 'center', paddingHorizontal: 4 },
   acaoIconeBox: {
     width: 60, height: 60, borderRadius: 18,
-    justifyContent: 'center', alignItems: 'center',
-    marginBottom: 8,
+    justifyContent: 'center', alignItems: 'center', marginBottom: 8,
     shadowColor: '#481D94', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
-    ...Platform.select({
-      web: { boxShadow: '0px 4px 8px rgba(72, 29, 148, 0.3)' }
-    })
+    ...Platform.select({ web: { boxShadow: '0px 4px 8px rgba(72, 29, 148, 0.3)' } })
   },
   acaoLabel: { fontSize: 11, fontWeight: '700', color: '#301971', textAlign: 'center' },
 
