@@ -249,7 +249,6 @@ function CardMedicamento({
   const [expandido, setExpandido] = useState(false)
   const sc = statusCor(med.status)
 
-  // Horários formatados
   const hs = med.medicamento_horarios ?? []
   function renderHorariosTexto(): string | null {
     if (med.frequencia_tipo === 'diario') {
@@ -300,7 +299,6 @@ function CardMedicamento({
 
   return (
     <View style={styles.card}>
-      {/* Topo sempre visível */}
       <View style={styles.cardTopo}>
         <LinearGradient
           colors={med.status === 'ativo' ? ['#6B49AD', '#481D94'] : ['#9163CB', '#7C4FBD']}
@@ -325,9 +323,7 @@ function CardMedicamento({
 
       <View style={styles.cardDivisor} />
 
-      {/* Infos sempre visíveis */}
       <View style={styles.cardInfos}>
-        {/* Badge status */}
         <View style={[styles.badgeStatus, { backgroundColor: sc.bg }]}>
           <Feather
             name={med.status === 'ativo' ? 'check-circle' : med.status === 'pausado' ? 'pause-circle' : 'x-circle'}
@@ -354,7 +350,6 @@ function CardMedicamento({
         ) : null}
       </View>
 
-      {/* Detalhes expandidos */}
       {expandido && temDetalhes && (
         <View style={styles.cardDetalhes}>
           <View style={styles.cardDivisor} />
@@ -417,7 +412,6 @@ function CardMedicamento({
         </View>
       )}
 
-      {/* Botão ver mais / ver menos */}
       {temDetalhes && (
         <TouchableOpacity
           onPress={() => setExpandido(e => !e)}
@@ -804,15 +798,11 @@ export default function Medicamentos() {
     )
   }
 
-  // ─── Render ───────────────────────────────────────────────────────────────
-
   return (
     <SafeAreaView style={[styles.safe, hideList === 'true' && { backgroundColor: 'transparent' }]} edges={['top']}>
       {hideList !== 'true' && (
         <>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-
-            {/* Card Perfil — idêntico ao exames */}
             <View style={styles.cardPerfil}>
               <TouchableOpacity onPress={() => router.push('/modulos/perfil' as any)} activeOpacity={0.85}>
                 {perfilFoto ? (
@@ -829,7 +819,6 @@ export default function Medicamentos() {
               </TouchableOpacity>
             </View>
 
-            {/* Título — idêntico ao exames */}
             <LinearGradient
               colors={['#6B49AD', '#6843B1', '#481D94']}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
@@ -838,7 +827,6 @@ export default function Medicamentos() {
               <Text style={styles.cardTituloTexto}>MEDICAMENTOS</Text>
             </LinearGradient>
 
-            {/* Filtros — idêntico ao exames */}
             <View style={styles.filtrosRow}>
               {(['todos', 'ativo', 'pausado', 'encerrado'] as Filtro[]).map((f) => (
                 <TouchableOpacity
@@ -864,7 +852,6 @@ export default function Medicamentos() {
               ))}
             </View>
 
-            {/* Lista */}
             <View style={styles.cardLista}>
               {listaFiltrada.length === 0 ? (
                 <View style={styles.vazioContainer}>
@@ -892,7 +879,6 @@ export default function Medicamentos() {
             </View>
           </ScrollView>
 
-          {/* FAB — idêntico ao exames */}
           <TouchableOpacity onPress={() => abrirModal()} activeOpacity={0.85} style={styles.fab}>
             <LinearGradient
               colors={['#6B49AD', '#481D94']}
@@ -1063,7 +1049,7 @@ export default function Medicamentos() {
       </Modal>
 
       {/* Modal excluir */}
-      <Modal visible={modalExcluir} transparent animationType="fade" onRequestClose={() => {}}>
+      <Modal visible={modalExcluir} transparent animationType="fade" onRequestClose={() => { }}>
         <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFillObject} experimentalBlurMethod="dimezisBlurView" />
         <View style={[styles.modalExcluirFundo, { backgroundColor: 'transparent' }]}>
           <View style={styles.modalExcluirCard}>
@@ -1083,7 +1069,7 @@ export default function Medicamentos() {
       </Modal>
 
       {/* Modal pausar */}
-      <Modal visible={modalPausar} transparent animationType="fade" onRequestClose={() => {}}>
+      <Modal visible={modalPausar} transparent animationType="fade" onRequestClose={() => { }}>
         <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFillObject} experimentalBlurMethod="dimezisBlurView" />
         <View style={[styles.modalCentroFundo, { backgroundColor: 'transparent' }]}>
           <View style={styles.modalCentroCard}>
@@ -1122,12 +1108,11 @@ export default function Medicamentos() {
   )
 }
 
-// ─── Styles — cópia exata do exames.tsx ──────────────────────────────────────
+// ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F5F0FF' },
 
-  // Header
   cardPerfil: {
     backgroundColor: '#fff', marginHorizontal: 16, marginTop: 16,
     borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10,
@@ -1146,7 +1131,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
 
-  // Título
   cardTituloLista: {
     marginHorizontal: 16, marginTop: 12, borderRadius: 50,
     paddingVertical: 14, alignItems: 'center',
@@ -1155,7 +1139,6 @@ const styles = StyleSheet.create({
   },
   cardTituloTexto: { fontSize: 14, fontWeight: '800', color: '#fff', letterSpacing: 3 },
 
-  // Filtros — cópia exata do exames
   filtrosRow: {
     flexDirection: 'row', alignItems: 'center',
     marginHorizontal: 16, marginTop: 12, gap: 8,
@@ -1174,7 +1157,6 @@ const styles = StyleSheet.create({
   chipTexto: { fontSize: 12, fontWeight: '700', color: '#481D94' },
   chipTextoAtivo: { fontSize: 12, fontWeight: '700', color: '#fff' },
 
-  // FAB
   fab: {
     position: 'absolute', bottom: 28, right: 24,
     borderRadius: 999,
@@ -1183,7 +1165,6 @@ const styles = StyleSheet.create({
   },
   fabGradient: { width: 60, height: 60, borderRadius: 999, justifyContent: 'center', alignItems: 'center' },
 
-  // Lista
   cardLista: {
     marginHorizontal: 16, marginTop: 14, backgroundColor: '#fff',
     borderRadius: 24, padding: 16,
@@ -1198,7 +1179,6 @@ const styles = StyleSheet.create({
   vazioTitulo: { fontSize: 17, fontWeight: '700', color: '#301971' },
   vazioSub: { fontSize: 14, color: '#9163CB' },
 
-  // Card — cópia exata do exames
   card: {
     backgroundColor: '#FAFAFE', borderRadius: 18, padding: 16,
     borderWidth: 1, borderColor: '#EDE8FA',
@@ -1231,7 +1211,6 @@ const styles = StyleSheet.create({
   },
   badgeStatusTexto: { fontSize: 11, fontWeight: '700' },
 
-  // Ver mais — cópia exata do exames (com linha divisória acima)
   verMaisBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 4, marginTop: 10, paddingTop: 10,
@@ -1239,7 +1218,6 @@ const styles = StyleSheet.create({
   },
   verMaisTexto: { fontSize: 13, fontWeight: '700', color: '#6B49AD' },
 
-  // Modal form
   modalFundo: { flex: 1 },
   modalOverlay: { ...StyleSheet.absoluteFillObject, flex: 1 },
   modalCard: {
@@ -1278,7 +1256,6 @@ const styles = StyleSheet.create({
   botaoSalvar: { borderRadius: 50, paddingVertical: 18, alignItems: 'center' },
   botaoSalvarTexto: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 2 },
 
-  // Horários
   horarioRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   horarioInputWrapper: {
     flex: 1, flexDirection: 'row', alignItems: 'center',
@@ -1346,11 +1323,16 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top', minHeight: 80,
   },
 
-  // Modal excluir
-  modalExcluirFundo: { flex: 1, backgroundColor: '#00000066', justifyContent: 'flex-end' },
+  // ← CORRIGIDO: modal excluir centralizado igual ao sintomas.tsx
+  modalExcluirFundo: {
+    flex: 1, backgroundColor: '#00000066', justifyContent: 'center',
+    alignItems: 'center', paddingHorizontal: 32,
+  },
   modalExcluirCard: {
-    backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    backgroundColor: '#fff', borderRadius: 28, width: '100%',
     padding: 32, alignItems: 'center', gap: 12,
+    shadowColor: '#301971', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25, shadowRadius: 20, elevation: 14,
   },
   modalExcluirIcone: {
     width: 72, height: 72, borderRadius: 24, backgroundColor: '#FFF1F2',
@@ -1366,7 +1348,6 @@ const styles = StyleSheet.create({
   btnCancelar: { paddingVertical: 14 },
   btnCancelarTexto: { fontSize: 15, fontWeight: '600', color: '#9163CB' },
 
-  // Modal pausar
   modalCentroFundo: {
     flex: 1, backgroundColor: '#00000066', justifyContent: 'center',
     alignItems: 'center', paddingHorizontal: 28,
