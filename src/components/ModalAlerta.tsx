@@ -13,7 +13,7 @@ export default function ModalAlerta({ visivel, titulo, mensagem, onFechar }: Pro
   return (
     <Modal visible={visivel} transparent animationType="fade" onRequestClose={() => {}}>
       <View style={styles.fundoEscuro}>
-        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} experimentalBlurMethod="dimezisBlurView" />
+        <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFillObject} experimentalBlurMethod="dimezisBlurView" />
         <View style={styles.card}>
           <Text style={styles.titulo}>{titulo}</Text>
           <Text style={styles.mensagem}>{mensagem}</Text>
@@ -36,7 +36,7 @@ export default function ModalAlerta({ visivel, titulo, mensagem, onFechar }: Pro
 const styles = StyleSheet.create({
   fundoEscuro: {
     flex: 1,
-    backgroundColor: Platform.OS === 'android' ? 'rgba(0,0,0,0.55)' : 'rgba(0,0,0,0.2)',
+    backgroundColor: 'rgba(0,0,0,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
