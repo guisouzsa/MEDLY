@@ -183,27 +183,47 @@ async function agendarMedicamento(med: MedicamentoParaNotificar): Promise<number
       const dataNotificacao = new Date(dia)
       dataNotificacao.setHours(h, m, 0, 0)
 
-      // Não agendar se já passou
-      if (dataNotificacao <= agora) continue
-
       const descricao = [med.dosagem, med.quantidade_por_dose].filter(Boolean).join(' · ')
       const identificador = `med-${med.id}-${diaStr}-${horarioStr}`
 
-      await Notifications.scheduleNotificationAsync({
-        identifier: identificador,
-        content: {
-          title: 'Medicação',
-          body: `Tomar ${med.nome}${descricao ? ` (${descricao})` : ''}`,
-          sound: 'default',
-          categoryIdentifier: CATEGORIA_MEDICAMENTO,
-          data: { tipo: 'medicamento', id: med.id },
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.DATE,
-          date: dataNotificacao,
-        },
-      })
-      count++
+      const data24h = new Date(dataNotificacao.getTime() - 24 * 60 * 60 * 1000)
+      const data1h = new Date(dataNotificacao.getTime() - 1 * 60 * 60 * 1000)
+
+      if (data24h > agora) {
+        await Notifications.scheduleNotificationAsync({
+          identifier: `${identificador}-24h`,
+          content: {
+            title: 'Medicação em 24h',
+            body: `Tomar ${med.nome}${descricao ? ` (${descricao})` : ''} amanhã às ${horarioStr}`,
+            sound: 'default',
+            categoryIdentifier: CATEGORIA_MEDICAMENTO,
+            data: { tipo: 'medicamento', id: med.id },
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: data24h,
+          },
+        })
+        count++
+      }
+
+      if (data1h > agora) {
+        await Notifications.scheduleNotificationAsync({
+          identifier: `${identificador}-1h`,
+          content: {
+            title: 'Medicação em 1h',
+            body: `Tomar ${med.nome}${descricao ? ` (${descricao})` : ''} em 1h às ${horarioStr}`,
+            sound: 'default',
+            categoryIdentifier: CATEGORIA_MEDICAMENTO,
+            data: { tipo: 'medicamento', id: med.id },
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: data1h,
+          },
+        })
+        count++
+      }
     }
   }
 
@@ -292,29 +312,50 @@ async function agendarConsulta(consulta: ConsultaParaNotificar): Promise<number>
   const [h, m] = consulta.horario.slice(0, 5).split(':').map(Number)
   const dataNotificacao = new Date(ano, mes - 1, dia, h, m, 0)
 
-  // Não agendar se já passou ou se está além do período
-  if (dataNotificacao <= agora) return 0
   const limite = new Date()
   limite.setDate(agora.getDate() + DIAS_AGENDAMENTO)
-  if (dataNotificacao > limite) return 0
 
   const identificador = `con-${consulta.id}`
+  const horarioStr = consulta.horario.slice(0, 5)
 
-  await Notifications.scheduleNotificationAsync({
-    identifier: identificador,
-    content: {
-      title: 'Consulta',
-      body: `${consulta.especialidade} com Dr(a). ${consulta.nome_medico} às ${consulta.horario.slice(0, 5)}`,
-      sound: 'default',
-      categoryIdentifier: CATEGORIA_CONSULTA,
-      data: { tipo: 'consulta', id: consulta.id },
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DATE,
-      date: dataNotificacao,
-    },
-  })
-  count++
+  const data24h = new Date(dataNotificacao.getTime() - 24 * 60 * 60 * 1000)
+  const data1h = new Date(dataNotificacao.getTime() - 1 * 60 * 60 * 1000)
+
+  if (data24h > agora && data24h <= limite) {
+    await Notifications.scheduleNotificationAsync({
+      identifier: `${identificador}-24h`,
+      content: {
+        title: 'Consulta amanhã',
+        body: `${consulta.especialidade} com Dr(a). ${consulta.nome_medico} amanhã às ${horarioStr}`,
+        sound: 'default',
+        categoryIdentifier: CATEGORIA_CONSULTA,
+        data: { tipo: 'consulta', id: consulta.id },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: data24h,
+      },
+    })
+    count++
+  }
+
+  if (data1h > agora && data1h <= limite) {
+    await Notifications.scheduleNotificationAsync({
+      identifier: `${identificador}-1h`,
+      content: {
+        title: 'Consulta em 1h',
+        body: `${consulta.especialidade} com Dr(a). ${consulta.nome_medico} em 1h às ${horarioStr}`,
+        sound: 'default',
+        categoryIdentifier: CATEGORIA_CONSULTA,
+        data: { tipo: 'consulta', id: consulta.id },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: data1h,
+      },
+    })
+    count++
+  }
 
   return count
 }
@@ -343,30 +384,50 @@ async function agendarExame(exame: ExameParaNotificar): Promise<number> {
   const [h, m] = horarioStr.split(':').map(Number)
   const dataNotificacao = new Date(ano, mes - 1, dia, h, m, 0)
 
-  // Não agendar se já passou ou se está além do período
-  if (dataNotificacao <= agora) return 0
   const limite = new Date()
   limite.setDate(agora.getDate() + DIAS_AGENDAMENTO)
-  if (dataNotificacao > limite) return 0
 
   const identificador = `exa-${exame.id}`
   const localTexto = exame.local ? ` em ${exame.local}` : ''
 
-  await Notifications.scheduleNotificationAsync({
-    identifier: identificador,
-    content: {
-      title: 'Exame',
-      body: `${exame.nome} às ${horarioStr}${localTexto}`,
-      sound: 'default',
-      categoryIdentifier: CATEGORIA_EXAME,
-      data: { tipo: 'exame', id: exame.id },
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DATE,
-      date: dataNotificacao,
-    },
-  })
-  count++
+  const data24h = new Date(dataNotificacao.getTime() - 24 * 60 * 60 * 1000)
+  const data1h = new Date(dataNotificacao.getTime() - 1 * 60 * 60 * 1000)
+
+  if (data24h > agora && data24h <= limite) {
+    await Notifications.scheduleNotificationAsync({
+      identifier: `${identificador}-24h`,
+      content: {
+        title: 'Exame amanhã',
+        body: `${exame.nome} amanhã às ${horarioStr}${localTexto}`,
+        sound: 'default',
+        categoryIdentifier: CATEGORIA_EXAME,
+        data: { tipo: 'exame', id: exame.id },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: data24h,
+      },
+    })
+    count++
+  }
+
+  if (data1h > agora && data1h <= limite) {
+    await Notifications.scheduleNotificationAsync({
+      identifier: `${identificador}-1h`,
+      content: {
+        title: 'Exame em 1h',
+        body: `${exame.nome} em 1h às ${horarioStr}${localTexto}`,
+        sound: 'default',
+        categoryIdentifier: CATEGORIA_EXAME,
+        data: { tipo: 'exame', id: exame.id },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: data1h,
+      },
+    })
+    count++
+  }
 
   return count
 }
