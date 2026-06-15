@@ -1,7 +1,6 @@
 import { Feather } from '@expo/vector-icons'
 import { BlurView } from 'expo-blur'
 import * as DocumentPicker from 'expo-document-picker'
-import * as FileSystem from 'expo-file-system/legacy'
 import { LinearGradient } from 'expo-linear-gradient'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -102,15 +101,6 @@ function toDate(exame: Exame): Date {
   const horarioStr = exame.horario ? exame.horario.slice(0, 5) : '00:00'
   const [hora, minuto] = horarioStr.split(':').map(Number)
   return new Date(ano, mes - 1, dia, hora, minuto)
-}
-
-// ─── Copia o arquivo para diretório permanente (fix Android cache) ────────────
-
-async function copiarParaDiretorioPermanente(uri: string, nomeArq: string): Promise<string> {
-  if (Platform.OS === 'web') return uri
-  const destino = `${FileSystem.documentDirectory}${Date.now()}_${nomeArq.replace(/\s/g, '_')}`
-  await FileSystem.copyAsync({ from: uri, to: destino })
-  return destino
 }
 
 // ─── Componentes internos ─────────────────────────────────────────────────────
@@ -371,6 +361,9 @@ export default function Exames() {
   const [arquivoUrlRemota, setArquivoUrlRemota] = useState<string | null>(null)
   const [arquivoNome, setArquivoNome] = useState('')
 
+  // ← CORREÇÃO: buffer lido antecipadamente para evitar ENOENT no Android
+  const arquivoBufferRef = useRef<ArrayBuffer | null>(null)
+
   const [carregando, setCarregando] = useState(false)
   const [modalExcluir, setModalExcluir] = useState(false)
   const [excluirId, setExcluirId] = useState<number | null>(null)
@@ -452,7 +445,9 @@ export default function Exames() {
 
   function resetForm() {
     setNome(''); setDataRealizacao(''); setHorario(''); setDataResultado(''); setLocal('')
-    setArquivoLocal(null); setArquivoUrlRemota(null); setArquivoNome(''); setErros({})
+    setArquivoLocal(null); setArquivoUrlRemota(null); setArquivoNome('')
+    arquivoBufferRef.current = null // ← limpa buffer ao resetar
+    setErros({})
   }
 
   function abrirModal(exame?: Exame) {
@@ -464,6 +459,7 @@ export default function Exames() {
       setDataResultado(exame.data_resultado ? formatarDataParaTela(exame.data_resultado) : '')
       setLocal(exame.local ?? '')
       setArquivoLocal(null)
+      arquivoBufferRef.current = null // ← ao editar, não há buffer local
       setArquivoUrlRemota(exame.arquivo_url ?? null)
       if (exame.arquivo_url) {
         const parts = exame.arquivo_url.split('/')
@@ -501,6 +497,7 @@ export default function Exames() {
     return true
   }
 
+  // ← CORREÇÃO: lê o arquivo imediatamente enquanto o cache ainda existe
   async function escolherArquivo() {
     try {
       const resultado = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true })
@@ -511,11 +508,12 @@ export default function Exames() {
         const extRaw = parts.length > 1 ? parts.pop()!.toLowerCase() : 'pdf'
         const ext = ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp'].includes(extRaw) ? extRaw : 'pdf'
 
-        // ← FIX: copia para diretório permanente antes de salvar no estado
-        // O cache do DocumentPicker no Android pode ser limpo a qualquer momento
-        const uriPermanente = await copiarParaDiretorioPermanente(asset.uri, nomeArq)
+        // Lê o arquivo enquanto o DocumentPicker ainda garante que ele existe
+        const buffer = await readUriAsArrayBuffer(asset.uri)
+        arquivoBufferRef.current = buffer
 
-        setArquivoLocal({ uri: uriPermanente, nome: nomeArq, ext })
+        // URI apenas para preview visual (Image source)
+        setArquivoLocal({ uri: asset.uri, nome: nomeArq, ext })
         setArquivoUrlRemota(null)
         setArquivoNome(nomeArq)
       }
@@ -526,7 +524,10 @@ export default function Exames() {
   }
 
   function removerArquivo() {
-    setArquivoLocal(null); setArquivoUrlRemota(null); setArquivoNome('')
+    setArquivoLocal(null)
+    setArquivoUrlRemota(null)
+    setArquivoNome('')
+    arquivoBufferRef.current = null // ← limpa buffer ao remover
   }
 
   function abrirVisualizador(url: string, isImage: boolean) {
@@ -539,17 +540,25 @@ export default function Exames() {
     setCarregando(true)
     try {
       let urlFinal: string | null = arquivoUrlRemota
+
       if (arquivoLocal) {
-        const { uri, nome: nomeArq, ext } = arquivoLocal
-        const uploadData = await readUriAsArrayBuffer(uri)
+        const { ext } = arquivoLocal
+
+        // ← CORREÇÃO: usa o buffer já lido, sem acessar o disco novamente
+        const uploadData = arquivoBufferRef.current
+        if (!uploadData) throw new Error('Arquivo não pôde ser lido. Por favor, selecione o arquivo novamente.')
+
         const fileName = `${usuarioId}_${Date.now()}.${ext}`
         const contentType = mimeFromExtension(ext)
+
         const { error: uploadError } = await supabase.storage
           .from('exames_arquivos').upload(fileName, uploadData, { contentType, upsert: true })
         if (uploadError) throw new Error('Falha no upload do arquivo.')
+
         const { data: { publicUrl } } = supabase.storage.from('exames_arquivos').getPublicUrl(fileName)
         urlFinal = publicUrl
       }
+
       const payload = {
         usuario_id: usuarioId, nome: nome.trim(),
         data_realizacao: converterData(dataRealizacao),
@@ -557,6 +566,7 @@ export default function Exames() {
         data_resultado: dataResultado.length === 10 ? converterData(dataResultado) : null,
         local: local.trim() || null, arquivo_url: urlFinal,
       }
+
       if (editando) {
         const { error } = await supabase.from('exames').update(payload).eq('id', editando.id)
         if (error) throw error
@@ -566,6 +576,7 @@ export default function Exames() {
         if (error) throw error
         await salvarHistorico(usuarioId, `Exame ${nome.trim()} foi cadastrado`)
       }
+
       await buscar()
       await reagendarTodasNotificacoes(usuarioId!).catch(console.error)
       setModalSucesso({
@@ -1009,10 +1020,12 @@ const styles = StyleSheet.create({
   removerArquivoBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   removerArquivoTexto: { fontSize: 12, fontWeight: '700', color: '#dc2626' },
 
-  modalExcluirFundo: { flex: 1, backgroundColor: '#00000066', justifyContent: 'flex-end' },
+  modalExcluirFundo: { flex: 1, backgroundColor: '#00000066', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
   modalExcluirCard: {
-    backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    backgroundColor: '#fff', borderRadius: 28, width: '100%',
     padding: 32, alignItems: 'center', gap: 12,
+    shadowColor: '#301971', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25, shadowRadius: 20, elevation: 14,
   },
   modalExcluirIcone: { width: 72, height: 72, borderRadius: 24, backgroundColor: '#FFF1F2', justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
   modalExcluirTitulo: { fontSize: 20, fontWeight: '800', color: '#301971' },
