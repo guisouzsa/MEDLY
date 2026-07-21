@@ -729,7 +729,6 @@ O sistema utiliza:
 O Medly foi desenvolvido para:
 
 * Pessoas com doenças crônicas
-* Idosos
 * Pacientes em tratamento contínuo
 * Pessoas com dificuldades de memória
 * Usuários que desejam organizar compromissos e medicamentos
