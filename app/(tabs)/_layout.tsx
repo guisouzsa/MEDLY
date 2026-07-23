@@ -57,6 +57,13 @@ export default function TabsLayout() {
           tabBarIcon: ({ color }) => <Feather name="calendar" size={24} color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="ia"
+        options={{
+          title: 'Agente IA',
+          tabBarIcon: ({ color }) => <Feather name="cpu" size={23} color={color} />,
+        }}
+      />
     </Tabs>
   )
 }
